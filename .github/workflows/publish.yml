@@ -12,12 +12,13 @@ on:
         default: true
         type: boolean
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
 
     steps:
       - uses: actions/checkout@v6
@@ -48,6 +49,14 @@ jobs:
       - run: bun run test:ci:unit
       # Integration tests skipped in publish - already validated on push to main
       - run: npm pack --dry-run
+
+      - name: Verify trusted publishing environment
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
+        run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "GitHub OIDC token is not available; npm trusted publishing requires id-token: write"
+            exit 1
+          fi
 
       - name: Publish to npm
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
