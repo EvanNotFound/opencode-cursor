@@ -1,8 +1,60 @@
 import { describe, expect, it } from "bun:test";
+import type { OpenAiToolCall } from "../../src/proxy/tool-loop";
 import {
   applyToolSchemaCompat,
   buildToolSchemaMap,
+  isFullFileShapedEditValidationFailure,
+  tryRerouteEditToWrite,
 } from "../../src/provider/tool-schema-compat";
+
+function buildEditWriteSchemaMap(writeUsesFilePath = false): Map<string, unknown> {
+  return new Map([
+    [
+      "edit",
+      {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          old_string: { type: "string" },
+          new_string: { type: "string" },
+        },
+        required: ["path", "old_string", "new_string"],
+        additionalProperties: false,
+      },
+    ],
+    [
+      "write",
+      writeUsesFilePath
+        ? {
+            type: "object",
+            properties: {
+              filePath: { type: "string" },
+              content: { type: "string" },
+            },
+            required: ["filePath", "content"],
+          }
+        : {
+            type: "object",
+            properties: {
+              path: { type: "string" },
+              content: { type: "string" },
+            },
+            required: ["path", "content"],
+          },
+    ],
+  ]);
+}
+
+function editToolCall(args: Record<string, unknown>, id = "c_edit"): OpenAiToolCall {
+  return {
+    id,
+    type: "function",
+    function: {
+      name: "edit",
+      arguments: JSON.stringify(args),
+    },
+  };
+}
 
 describe("tool schema compatibility", () => {
   it("normalizes common argument aliases to canonical keys", () => {
@@ -272,7 +324,7 @@ describe("tool schema compatibility", () => {
     expect(todos[4].priority).toBe("medium");
   });
 
-  it("repairs edit content payloads into new_string without synthesizing empty old_string", () => {
+  it("regression: does not synthesize old_string for path+content edit", () => {
     const result = applyToolSchemaCompat(
       {
         id: "c1",
@@ -309,7 +361,7 @@ describe("tool schema compatibility", () => {
     expect(args.content).toBeUndefined();
     expect(result.validation.ok).toBe(false);
     expect(result.validation.missing).toEqual(["old_string"]);
-    expect(result.validation.typeErrors).toEqual([]);
+    expect(result.validation.repairHint).toContain("write");
   });
 
   it("repairs edit content into new_string even when path is missing", () => {
@@ -419,6 +471,7 @@ describe("tool schema compatibility", () => {
     expect(args.new_string).toBe("updated body");
     expect(result.validation.ok).toBe(false);
     expect(result.validation.missing).toEqual(["old_string"]);
+    expect(result.validation.repairHint).toContain("write");
   });
 
   it("coerces array streamContent chunks into edit new_string", () => {
@@ -579,6 +632,201 @@ describe("tool schema compatibility", () => {
     expect(args.new_string).toBe("-- test\nreturn {");
     expect(result.validation.ok).toBe(false);
     expect(result.validation.missing).toEqual(["old_string"]);
+  });
+
+  it("regression: does not synthesize old_string for path+new_string only", () => {
+    const result = applyToolSchemaCompat(
+      {
+        id: "c_path_new_only",
+        type: "function",
+        function: {
+          name: "edit",
+          arguments: JSON.stringify({
+            path: "/tmp/out.txt",
+            new_string: "entire body",
+          }),
+        },
+      },
+      new Map([
+        [
+          "edit",
+          {
+            type: "object",
+            properties: {
+              path: { type: "string" },
+              old_string: { type: "string" },
+              new_string: { type: "string" },
+            },
+            required: ["path", "old_string", "new_string"],
+            additionalProperties: false,
+          },
+        ],
+      ]),
+    );
+
+    const args = JSON.parse(result.toolCall.function.arguments);
+    expect(args.path).toBe("/tmp/out.txt");
+    expect(args.old_string).toBeUndefined();
+    expect(args.new_string).toBe("entire body");
+    expect(result.validation.ok).toBe(false);
+    expect(result.validation.missing).toEqual(["old_string"]);
+    expect(result.validation.repairHint).toContain("write");
+  });
+
+  describe("edit to write reroute", () => {
+    it("full-file hint uses filePath when write schema requires filePath", () => {
+      const toolSchemaMap = buildEditWriteSchemaMap(true);
+      const result = applyToolSchemaCompat(
+        editToolCall({ path: "/tmp/out.txt", content: "entire body" }, "c_file_path_write_hint"),
+        toolSchemaMap,
+      );
+
+      expect(result.validation.ok).toBe(false);
+      expect(result.validation.repairHint).toContain("filePath");
+      expect(result.validation.repairHint).toContain("write");
+    });
+
+    it("tryRerouteEditToWrite converts path+content edit to write", () => {
+      const toolSchemaMap = buildEditWriteSchemaMap(false);
+      const call = editToolCall({ path: "/tmp/x", content: "body" }, "c_reroute");
+      const compat = applyToolSchemaCompat(call, toolSchemaMap);
+      const rerouted = tryRerouteEditToWrite(
+        call,
+        compat,
+        new Set(["edit", "write"]),
+        toolSchemaMap,
+      );
+      expect(rerouted?.function.name).toBe("write");
+      const args = JSON.parse(rerouted?.function.arguments ?? "{}");
+      expect(args.path).toBe("/tmp/x");
+      expect(args.content).toBe("body");
+    });
+
+    it("tryRerouteEditToWrite uses filePath when write schema requires filePath", () => {
+      const toolSchemaMap = buildEditWriteSchemaMap(true);
+      const call = editToolCall({ path: "/tmp/x", content: "body" });
+      const compat = applyToolSchemaCompat(call, toolSchemaMap);
+      const rerouted = tryRerouteEditToWrite(
+        call,
+        compat,
+        new Set(["edit", "write"]),
+        toolSchemaMap,
+      );
+      expect(rerouted?.function.name).toBe("write");
+      const args = JSON.parse(rerouted?.function.arguments ?? "{}");
+      expect(args.filePath).toBe("/tmp/x");
+      expect(args.content).toBe("body");
+      expect(args.path).toBeUndefined();
+    });
+
+    it("tryRerouteEditToWrite returns null when write not in allowedToolNames", () => {
+      const toolSchemaMap = buildEditWriteSchemaMap(false);
+      const call = editToolCall({ path: "/tmp/x", content: "body" });
+      const compat = applyToolSchemaCompat(call, toolSchemaMap);
+      const rerouted = tryRerouteEditToWrite(call, compat, new Set(["edit"]), toolSchemaMap);
+      expect(rerouted).toBeNull();
+      expect(compat.validation.ok).toBe(false);
+    });
+
+    it("tryRerouteEditToWrite returns null when write missing from schema map", () => {
+      const editOnlyMap = new Map([
+        [
+          "edit",
+          {
+            type: "object",
+            properties: {
+              path: { type: "string" },
+              old_string: { type: "string" },
+              new_string: { type: "string" },
+            },
+            required: ["path", "old_string", "new_string"],
+          },
+        ],
+      ]);
+      const call = editToolCall({ path: "/tmp/x", content: "body" });
+      const compat = applyToolSchemaCompat(call, editOnlyMap);
+      const rerouted = tryRerouteEditToWrite(
+        call,
+        compat,
+        new Set(["edit", "write"]),
+        editOnlyMap,
+      );
+      expect(rerouted).toBeNull();
+    });
+
+    it("tryRerouteEditToWrite returns null for explicit old_string empty", () => {
+      const toolSchemaMap = buildEditWriteSchemaMap(false);
+      const call = editToolCall({
+        path: "TODO.md",
+        old_string: "",
+        new_string: "replacement",
+      });
+      const compat = applyToolSchemaCompat(call, toolSchemaMap);
+      const rerouted = tryRerouteEditToWrite(
+        call,
+        compat,
+        new Set(["edit", "write"]),
+        toolSchemaMap,
+      );
+      expect(rerouted).toBeNull();
+      expect(compat.validation.missing).toEqual(["old_string"]);
+    });
+
+    it("tryRerouteEditToWrite returns null when path missing", () => {
+      const toolSchemaMap = buildEditWriteSchemaMap(false);
+      const call = editToolCall({ content: "body only" });
+      const compat = applyToolSchemaCompat(call, toolSchemaMap);
+      const rerouted = tryRerouteEditToWrite(
+        call,
+        compat,
+        new Set(["edit", "write"]),
+        toolSchemaMap,
+      );
+      expect(rerouted).toBeNull();
+    });
+
+    it("tryRerouteEditToWrite reroutes after streamContent repair", () => {
+      const toolSchemaMap = buildEditWriteSchemaMap(false);
+      const call = editToolCall({ path: "TODO.md", streamContent: "updated body" });
+      const compat = applyToolSchemaCompat(call, toolSchemaMap);
+      const rerouted = tryRerouteEditToWrite(
+        call,
+        compat,
+        new Set(["edit", "write"]),
+        toolSchemaMap,
+      );
+      expect(rerouted?.function.name).toBe("write");
+      const args = JSON.parse(rerouted?.function.arguments ?? "{}");
+      expect(args.path).toBe("TODO.md");
+      expect(args.content).toBe("updated body");
+    });
+
+    it("isFullFileShapedEditValidationFailure true only for full-file shape", () => {
+      const toolSchemaMap = buildEditWriteSchemaMap(false);
+      const fullFileCall = editToolCall({ path: "/tmp/x", content: "body" });
+      const fullFileCompat = applyToolSchemaCompat(fullFileCall, toolSchemaMap);
+      expect(
+        isFullFileShapedEditValidationFailure(
+          "edit",
+          fullFileCompat.normalizedArgs,
+          fullFileCompat.validation,
+          fullFileCompat.originalArgs,
+          toolSchemaMap.get("write"),
+        ),
+      ).toBe(true);
+
+      const missingPathCall = editToolCall({ content: "body only" });
+      const missingPathCompat = applyToolSchemaCompat(missingPathCall, toolSchemaMap);
+      expect(
+        isFullFileShapedEditValidationFailure(
+          "edit",
+          missingPathCompat.normalizedArgs,
+          missingPathCompat.validation,
+          missingPathCompat.originalArgs,
+          toolSchemaMap.get("write"),
+        ),
+      ).toBe(false);
+    });
   });
 
   it("preserves valid edit calls with explicit old/new strings", () => {

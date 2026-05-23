@@ -533,10 +533,6 @@ function resolveEditArguments(args: Record<string, unknown>): {
     }
   }
 
-  if (oldString === undefined && newString !== undefined) {
-    oldString = "";
-  }
-
   return {
     path,
     old_string: oldString,
