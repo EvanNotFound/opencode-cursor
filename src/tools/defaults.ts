@@ -197,6 +197,9 @@ export function registerDefaultTools(registry: ToolRegistry): void {
       if (typeof oldString !== "string") {
         throw new Error("edit: missing required argument 'old_string'");
       }
+      if (oldString.length === 0) {
+        throw new Error("edit: old_string must not be empty; use write to overwrite an entire file");
+      }
       if (typeof newString !== "string") {
         throw new Error("edit: missing required argument 'new_string'");
       }
@@ -213,11 +216,6 @@ export function registerDefaultTools(registry: ToolRegistry): void {
           return `File did not exist. Created and wrote content: ${filePath}`;
         }
         throw error;
-      }
-
-      if (!oldString) {
-        fs.writeFileSync(filePath, newString, "utf-8");
-        return `File edited successfully: ${filePath}`;
       }
 
       if (!content.includes(oldString)) {

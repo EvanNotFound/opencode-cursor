@@ -238,6 +238,30 @@ describe("Default Tools", () => {
     expect(result.error).toContain("missing required argument 'old_string'");
   });
 
+  it("regression: rejects edit payloads with empty old_string without overwriting existing files", async () => {
+    const registry = new ToolRegistry();
+    registerDefaultTools(registry);
+    const executor = new LocalExecutor(registry);
+
+    const fs = await import("fs");
+    const tmpFile = `/tmp/test-edit-empty-old-${Date.now()}.txt`;
+    fs.writeFileSync(tmpFile, "alpha\nbeta\ngamma\n", "utf-8");
+
+    try {
+      const result = await executeWithChain([executor], "edit", {
+        path: tmpFile,
+        old_string: "",
+        new_string: "beta changed",
+      });
+
+      expect(result.status).toBe("error");
+      expect(result.error).toContain("old_string");
+      expect(fs.readFileSync(tmpFile, "utf-8")).toBe("alpha\nbeta\ngamma\n");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
   it("should get all tool definitions", () => {
     const registry = new ToolRegistry();
     registerDefaultTools(registry);

@@ -195,6 +195,27 @@ describe("Plugin tool hook", () => {
     }
   });
 
+  it("rejects oc_edit with empty old_string without overwriting existing files", async () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "plugin-hook-oc-edit-empty-old-"));
+    try {
+      const target = join(projectDir, "file.txt");
+      const hooks = await CursorPlugin(createMockInput(projectDir));
+      const { writeFileSync } = await import("fs");
+      writeFileSync(target, "alpha\nbeta\ngamma\n", "utf-8");
+
+      await expect(
+        hooks.tool?.oc_edit?.execute(
+          { path: target, old_string: "", new_string: "beta changed" },
+          createToolContext(projectDir, projectDir),
+        ),
+      ).rejects.toThrow("old_string");
+
+      expect(readFileSync(target, "utf-8")).toBe("alpha\nbeta\ngamma\n");
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
   it("pins non-config workspace per session and reuses it when later context loses worktree", async () => {
     const projectDir = mkdtempSync(join(tmpdir(), "plugin-hook-session-pin-project-"));
     const xdgConfigHome = mkdtempSync(join(tmpdir(), "plugin-hook-session-pin-xdg-"));
