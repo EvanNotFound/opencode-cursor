@@ -23,6 +23,7 @@ import { resolveCursorAgentBinary } from "../utils/binary.js";
 import { getPossibleAuthPaths, isUsableSdkApiKey } from "../auth.js";
 import { parseCursorBackendPreference } from "../provider/backend.js";
 import { groupCursorModels, mergeCursorModelEntries } from "../models/variants.js";
+import { resolveOpenCodeConfigPath } from "../plugin-toggle.js";
 import type { DiscoveredModel } from "./model-discovery.js";
 
 const BRANDING_HEADER = `
@@ -446,7 +447,7 @@ function getConfigHome(): string {
 
 export function resolvePaths(options: Options) {
   const opencodeDir = join(getConfigHome(), "opencode");
-  const configPath = resolve(options.config || process.env.OPENCODE_CONFIG || join(opencodeDir, "opencode.json"));
+  const configPath = options.config ? resolve(options.config) : resolveOpenCodeConfigPath();
   const pluginDir = resolve(options.pluginDir || join(opencodeDir, "plugin"));
   const pluginPath = join(pluginDir, `${PROVIDER_ID}.js`);
   return { opencodeDir, configPath, pluginDir, pluginPath };
