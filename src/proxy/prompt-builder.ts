@@ -2,6 +2,60 @@ import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("proxy:prompt-builder");
 
+// Cache the tool schema block — tools don't change between requests in a session.
+let _cachedToolFingerprint = "";
+let _cachedToolBlock = "";
+
+/** Clear cached tool schema block (for testing only). */
+export function _resetToolSchemaCache(): void {
+  _cachedToolFingerprint = "";
+  _cachedToolBlock = "";
+}
+
+function buildToolFingerprint(tools: Array<any>): string {
+  if (tools.length === 0) return "";
+  // Include names + descriptions + parameter key counts to detect schema changes
+  // without the cost of full JSON.stringify on every request.
+  const parts = tools.map((t: any) => {
+    const fn = t.function || t;
+    const name = fn.name || "?";
+    const desc = fn.description || "";
+    const paramKeys = fn.parameters ? Object.keys(fn.parameters.properties || {}).length : 0;
+    return `${name}:${desc.length}:${paramKeys}`;
+  });
+  parts.sort();
+  return `${parts.length}:${parts.join("|")}`;
+}
+
+function buildToolSchemaBlock(tools: Array<any>): string {
+  const fingerprint = buildToolFingerprint(tools);
+  if (fingerprint && fingerprint === _cachedToolFingerprint) {
+    return _cachedToolBlock;
+  }
+
+  const toolDescs = tools
+    .map((t: any) => {
+      const fn = t.function || t;
+      const name = fn.name || "unknown";
+      const desc = fn.description || "";
+      const params = fn.parameters;
+      const paramStr = params ? JSON.stringify(params) : "{}";
+      return `- ${name}: ${desc}\n  Parameters: ${paramStr}`;
+    })
+    .join("\n");
+
+  const block =
+    `SYSTEM: You have access to the following tools. When you need to use one, respond with a tool_call in the standard OpenAI format.\n` +
+    `Tool guidance: prefer write/edit for file changes; use bash mainly to run commands/tests.\n\nAvailable tools:\n${toolDescs}`;
+
+  if (fingerprint) {
+    _cachedToolFingerprint = fingerprint;
+    _cachedToolBlock = block;
+  }
+
+  return block;
+}
+
 /**
  * Build a text prompt from OpenAI chat messages + tool definitions.
  * Handles role:"tool" result messages and assistant tool_calls that
@@ -56,20 +110,7 @@ export function buildPromptFromMessages(messages: Array<any>, tools: Array<any>,
   const lines: string[] = [];
 
   if (tools.length > 0) {
-    const toolDescs = tools
-      .map((t: any) => {
-        const fn = t.function || t;
-        const name = fn.name || "unknown";
-        const desc = fn.description || "";
-        const params = fn.parameters;
-        const paramStr = params ? JSON.stringify(params) : "{}";
-        return `- ${name}: ${desc}\n  Parameters: ${paramStr}`;
-      })
-      .join("\n");
-    lines.push(
-      `SYSTEM: You have access to the following tools. When you need to use one, respond with a tool_call in the standard OpenAI format.\n` +
-        `Tool guidance: prefer write/edit for file changes; use bash mainly to run commands/tests.\n\nAvailable tools:\n${toolDescs}`,
-    );
+    lines.push(buildToolSchemaBlock(tools));
     const hasTaskTool = tools.some((t: any) => {
       const name = (t?.function?.name ?? t?.name ?? "").toLowerCase();
       return name === "task";
