@@ -4,20 +4,28 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import { createLogger, _resetLoggerState } from "../../../src/utils/logger.ts";
 
+const mockWrite = vi.fn().mockReturnValue(true);
+const mockEnd = vi.fn();
+const mockOn = vi.fn().mockReturnThis();
+
 vi.mock("node:fs", () => ({
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
-  appendFileSync: vi.fn(),
   statSync: vi.fn(),
   renameSync: vi.fn(),
+  createWriteStream: vi.fn(() => ({
+    write: mockWrite,
+    end: mockEnd,
+    on: mockOn,
+  })),
 }));
 
 type MockedFs = {
   existsSync: ReturnType<typeof vi.fn>;
   mkdirSync: ReturnType<typeof vi.fn>;
-  appendFileSync: ReturnType<typeof vi.fn>;
   statSync: ReturnType<typeof vi.fn>;
   renameSync: ReturnType<typeof vi.fn>;
+  createWriteStream: ReturnType<typeof vi.fn>;
 };
 
 const mockedFs = fs as unknown as MockedFs;
@@ -27,11 +35,12 @@ describe("logger", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    _resetLoggerState(); // Reset module-level state before each test
+    _resetLoggerState();
     process.env = { ...originalEnv };
     delete process.env.CURSOR_ACP_LOG_LEVEL;
     delete process.env.CURSOR_ACP_LOG_SILENT;
     delete process.env.CURSOR_ACP_LOG_CONSOLE;
+    mockedFs.statSync.mockReturnValue({ size: 1000 } as fs.Stats);
   });
 
   afterEach(() => {
@@ -41,7 +50,6 @@ describe("logger", () => {
   describe("file logging", () => {
     it("creates log directory if missing", () => {
       mockedFs.existsSync.mockReturnValue(false);
-      mockedFs.statSync.mockReturnValue({ size: 1000 } as fs.Stats);
 
       const log = createLogger("test");
       log.info("test message");
@@ -52,16 +60,18 @@ describe("logger", () => {
       );
     });
 
-    it("writes logs to file by default (not console)", () => {
+    it("opens a write stream and writes logs (not console)", () => {
       mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.statSync.mockReturnValue({ size: 1000 } as fs.Stats);
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const log = createLogger("test");
       log.info("test message");
 
-      expect(mockedFs.appendFileSync).toHaveBeenCalledWith(
+      expect(mockedFs.createWriteStream).toHaveBeenCalledWith(
         expect.stringContaining("plugin.log"),
+        { flags: "a" },
+      );
+      expect(mockWrite).toHaveBeenCalledWith(
         expect.stringMatching(/\[cursor-acp:test\] INFO\s+test message/),
       );
       expect(consoleSpy).not.toHaveBeenCalled();
@@ -71,7 +81,6 @@ describe("logger", () => {
     it("writes to console only when CURSOR_ACP_LOG_CONSOLE=1", () => {
       process.env.CURSOR_ACP_LOG_CONSOLE = "1";
       mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.statSync.mockReturnValue({ size: 1000 } as fs.Stats);
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const log = createLogger("test");
@@ -83,7 +92,7 @@ describe("logger", () => {
       consoleSpy.mockRestore();
     });
 
-    it("rotates log file when exceeds 5MB", () => {
+    it("rotates log file when byte counter exceeds 5MB", () => {
       mockedFs.existsSync.mockReturnValue(true);
       mockedFs.statSync.mockReturnValue({ size: 6 * 1024 * 1024 } as fs.Stats);
 
@@ -99,30 +108,25 @@ describe("logger", () => {
     it("respects CURSOR_ACP_LOG_SILENT", () => {
       process.env.CURSOR_ACP_LOG_SILENT = "1";
       mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.statSync.mockReturnValue({ size: 1000 } as fs.Stats);
 
       const log = createLogger("test");
       log.info("test message");
 
-      expect(mockedFs.appendFileSync).not.toHaveBeenCalled();
+      expect(mockWrite).not.toHaveBeenCalled();
     });
 
-    it("does not crash and falls back to silent if file write fails", () => {
+    it("does not crash if stream creation fails", () => {
       mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.statSync.mockReturnValue({ size: 1000 } as fs.Stats);
-      mockedFs.appendFileSync.mockImplementationOnce(() => {
+      mockedFs.createWriteStream.mockImplementationOnce(() => {
         throw new Error("EACCES");
       });
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const log = createLogger("test");
 
       expect(() => log.info("test message")).not.toThrow();
       expect(() => log.info("test message 2")).not.toThrow();
 
-      // First call throws, second call is skipped due to logFileError flag
-      expect(mockedFs.appendFileSync).toHaveBeenCalledTimes(1);
-      consoleSpy.mockRestore();
+      expect(mockWrite).not.toHaveBeenCalled();
     });
   });
 });

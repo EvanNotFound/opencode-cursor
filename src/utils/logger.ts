@@ -37,7 +37,6 @@ function shouldLog(level: LogLevel): boolean {
 }
 
 function formatMessage(level: LogLevel, component: string, message: string, data?: unknown): string {
-  const timestamp = new Date().toISOString();
   const prefix = `[cursor-acp:${component}]`;
   const levelTag = level.toUpperCase().padEnd(5);
 
@@ -61,11 +60,18 @@ function isConsoleEnabled(): boolean {
 
 let logDirEnsured = false;
 let logFileError = false;
+let logStream: fs.WriteStream | null = null;
+let logBytesWritten = 0;
 
 /** Reset internal state (for testing only) */
 export function _resetLoggerState(): void {
   logDirEnsured = false;
   logFileError = false;
+  if (logStream) {
+    logStream.end();
+    logStream = null;
+  }
+  logBytesWritten = 0;
 }
 
 function ensureLogDir(): void {
@@ -80,33 +86,58 @@ function ensureLogDir(): void {
   }
 }
 
-function rotateIfNeeded(): void {
+function openLogStream(): void {
+  if (logStream || logFileError) return;
+  ensureLogDir();
+  if (logFileError) return;
+
   try {
-    const stats = fs.statSync(LOG_FILE);
-    if (stats.size >= MAX_LOG_SIZE) {
-      const backupFile = LOG_FILE + ".1";
-      fs.renameSync(LOG_FILE, backupFile);
+    // Seed byte counter from existing file size
+    try {
+      logBytesWritten = fs.statSync(LOG_FILE).size;
+    } catch {
+      logBytesWritten = 0;
     }
+    logStream = fs.createWriteStream(LOG_FILE, { flags: "a" });
+    logStream.on("error", () => {
+      if (!logFileError) {
+        logFileError = true;
+        console.error(`[cursor-acp] Failed to write logs. Using: ${LOG_FILE}`);
+      }
+      logStream = null;
+    });
   } catch {
+    logFileError = true;
+  }
+}
+
+function rotateIfNeeded(): void {
+  if (logBytesWritten < MAX_LOG_SIZE) return;
+  try {
+    if (logStream) {
+      logStream.end();
+      logStream = null;
+    }
+    fs.renameSync(LOG_FILE, LOG_FILE + ".1");
+    logBytesWritten = 0;
+    openLogStream();
+  } catch {
+    // Rotation failed — keep writing to current file
   }
 }
 
 function writeToFile(message: string): void {
   if (logFileError) return;
 
-  ensureLogDir();
-  if (logFileError) return;
+  if (!logStream) openLogStream();
+  if (logFileError || !logStream) return;
 
-  try {
-    rotateIfNeeded();
-    const timestamp = new Date().toISOString();
-    fs.appendFileSync(LOG_FILE, `${timestamp} ${message}\n`);
-  } catch {
-    if (!logFileError) {
-      logFileError = true;
-      console.error(`[cursor-acp] Failed to write logs. Using: ${LOG_FILE}`);
-    }
-  }
+  rotateIfNeeded();
+
+  const timestamp = new Date().toISOString();
+  const line = `${timestamp} ${message}\n`;
+  logStream.write(line);
+  logBytesWritten += Buffer.byteLength(line);
 }
 
 export interface Logger {
