@@ -109,7 +109,7 @@ interface ReadSubagentNamesDeps {
 }
 
 export function readSubagentNames(deps: ReadSubagentNamesDeps = {}): string[] {
-  const useCache = !deps.configJson;
+  const useCache = deps.configJson == null;
   if (useCache && _subagentCache && Date.now() < _subagentCache.expiry) {
     return _subagentCache.names;
   }
