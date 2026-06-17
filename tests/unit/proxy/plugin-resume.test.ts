@@ -93,6 +93,63 @@ describe("plugin resume orchestration", () => {
     expect(followUp.usedIncremental).toBe(true);
   });
 
+  it("does not reuse a resume chat across diverged same-opening conversations", () => {
+    process.env.CURSOR_ACP_SESSION_RESUME = "1";
+    const firstTurn = resolvePromptForBackend(baseInput);
+    captureResumeChatIdFromEvent(
+      { type: "system", session_id: "chat-abc" } as any,
+      firstTurn.sessionKey,
+      "gpt-5",
+      "/workspace",
+      firstTurn.contentPrefix,
+    );
+
+    const branchA = resolvePromptForBackend({
+      ...baseInput,
+      messages: [
+        { role: "user", content: "Remember BETA" },
+        { role: "assistant", content: "Got it." },
+        { role: "user", content: "What was the codeword?" },
+      ],
+    });
+    expect(branchA.resumeChatId).toBe("chat-abc");
+    expect(branchA.recordContentPrefix).toBeString();
+    expect(branchA.recordContentPrefix).not.toBe(branchA.contentPrefix);
+    captureResumeChatIdFromEvent(
+      { type: "result", session_id: "chat-abc" } as any,
+      branchA.sessionKey,
+      "gpt-5",
+      "/workspace",
+      branchA.recordContentPrefix,
+    );
+
+    const branchB = resolvePromptForBackend({
+      ...baseInput,
+      messages: [
+        { role: "user", content: "Remember BETA" },
+        { role: "assistant", content: "Got it." },
+        { role: "user", content: "Summarize the repo instead" },
+      ],
+    });
+
+    expect(branchB.resumeChatId).toBeUndefined();
+    expect(branchB.usedIncremental).toBe(false);
+
+    const branchANext = resolvePromptForBackend({
+      ...baseInput,
+      messages: [
+        { role: "user", content: "Remember BETA" },
+        { role: "assistant", content: "Got it." },
+        { role: "user", content: "What was the codeword?" },
+        { role: "assistant", content: "BETA." },
+        { role: "user", content: "Write it lowercase" },
+      ],
+    });
+
+    expect(branchANext.resumeChatId).toBe("chat-abc");
+    expect(branchANext.usedIncremental).toBe(true);
+  });
+
   it("resolvePromptForBackend: enabled + chatId + incremental null → full prompt + resume", () => {
     process.env.CURSOR_ACP_SESSION_RESUME = "1";
     const { sessionKey, contentPrefix } = resolvePromptForBackend(baseInput);

@@ -33,6 +33,7 @@ import {
   buildSessionKey,
   clearResumeChatId,
   deriveConversationAnchor,
+  deriveConversationResumePrefixes,
   getResumeChatId,
   hasResumeChatId,
   hashForLog,
@@ -283,6 +284,7 @@ export interface ResolvedPrompt {
   sessionKey?: string;
   usedIncremental: boolean;
   contentPrefix?: string;
+  recordContentPrefix?: string;
   toolFingerprint?: string;
   subagentFingerprint?: string;
 }
@@ -323,7 +325,10 @@ export function resolvePromptForBackend(input: {
     });
     return { prompt: getFullPrompt(), usedIncremental: false };
   }
-  const { anchor, contentPrefix } = anchorResult;
+  const { anchor, contentPrefix: anchorContentPrefix } = anchorResult;
+  const resumePrefixes = deriveConversationResumePrefixes(input.messages);
+  const contentPrefix = resumePrefixes?.lookupContentPrefix ?? anchorContentPrefix;
+  const recordContentPrefix = resumePrefixes?.recordContentPrefix ?? contentPrefix;
   const sessionKey = buildSessionKey(input.workspaceDirectory, input.model, anchor);
   const sessionKeyHash = sanitizeSessionKey(sessionKey);
   const toolFingerprint = buildToolFingerprint(input.tools);
@@ -337,7 +342,7 @@ export function resolvePromptForBackend(input: {
         sessionKeyHash,
       });
     }
-    return { prompt: getFullPrompt(), sessionKey, usedIncremental: false, contentPrefix, toolFingerprint, subagentFingerprint };
+    return { prompt: getFullPrompt(), sessionKey, usedIncremental: false, contentPrefix, recordContentPrefix, toolFingerprint, subagentFingerprint };
   }
 
   const incremental = buildIncrementalPrompt(input.messages);
@@ -355,14 +360,14 @@ export function resolvePromptForBackend(input: {
         fullPromptChars: getFullPrompt().length,
       });
     }
-    return { prompt: incremental, resumeChatId, sessionKey, usedIncremental: true, contentPrefix, toolFingerprint, subagentFingerprint };
+    return { prompt: incremental, resumeChatId, sessionKey, usedIncremental: true, contentPrefix, recordContentPrefix, toolFingerprint, subagentFingerprint };
   }
 
   log.info("Session resume active but incremental prompt unavailable; using full prompt", {
     sessionKeyHash,
     resumeChatIdHash,
   });
-  return { prompt: getFullPrompt(), resumeChatId, sessionKey, usedIncremental: false, contentPrefix, toolFingerprint, subagentFingerprint };
+  return { prompt: getFullPrompt(), resumeChatId, sessionKey, usedIncremental: false, contentPrefix, recordContentPrefix, toolFingerprint, subagentFingerprint };
 }
 
 /**
@@ -1166,6 +1171,7 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
         sessionKey: sessionResumeKey,
         usedIncremental,
         contentPrefix: sessionResumeContentPrefix,
+        recordContentPrefix: sessionResumeRecordContentPrefix,
         toolFingerprint: sessionResumeToolFingerprint,
         subagentFingerprint: sessionResumeSubagentFingerprint,
       } = resolvePromptForBackend({
@@ -1229,14 +1235,14 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
           sessionResumeKey,
           model,
           workspaceDirectory,
-          sessionResumeContentPrefix,
+          sessionResumeRecordContentPrefix,
           sessionResumeToolFingerprint,
           sessionResumeSubagentFingerprint,
         );
         warnIfResumeNotCaptured(
           sessionResumeKey,
           sessionResumeKeyHash,
-          sessionResumeContentPrefix,
+          sessionResumeRecordContentPrefix,
           sessionResumeToolFingerprint,
           sessionResumeSubagentFingerprint,
           model,
@@ -1390,7 +1396,7 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
                   sessionResumeKey,
                   model,
                   workspaceDirectory,
-                  sessionResumeContentPrefix,
+                  sessionResumeRecordContentPrefix,
                   sessionResumeToolFingerprint,
                   sessionResumeSubagentFingerprint,
                 );
@@ -1470,7 +1476,7 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
                 sessionResumeKey,
                 model,
                 workspaceDirectory,
-                sessionResumeContentPrefix,
+                sessionResumeRecordContentPrefix,
                 sessionResumeToolFingerprint,
                 sessionResumeSubagentFingerprint,
               );
@@ -1564,7 +1570,7 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
             warnIfResumeNotCaptured(
               sessionResumeKey,
               sessionResumeKeyHash,
-              sessionResumeContentPrefix,
+              sessionResumeRecordContentPrefix,
               sessionResumeToolFingerprint,
               sessionResumeSubagentFingerprint,
               model,
@@ -1699,6 +1705,7 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
         sessionKey: sessionResumeKey,
         usedIncremental,
         contentPrefix: sessionResumeContentPrefix,
+        recordContentPrefix: sessionResumeRecordContentPrefix,
         toolFingerprint: sessionResumeToolFingerprint,
         subagentFingerprint: sessionResumeSubagentFingerprint,
       } = resolvePromptForBackend({
@@ -1773,14 +1780,14 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
             sessionResumeKey,
             model,
             workspaceDirectory,
-            sessionResumeContentPrefix,
+            sessionResumeRecordContentPrefix,
             sessionResumeToolFingerprint,
             sessionResumeSubagentFingerprint,
           );
           warnIfResumeNotCaptured(
             sessionResumeKey,
             sessionResumeKeyHashNode,
-            sessionResumeContentPrefix,
+            sessionResumeRecordContentPrefix,
             sessionResumeToolFingerprint,
             sessionResumeSubagentFingerprint,
             model,
@@ -1957,7 +1964,7 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
               sessionResumeKey,
               model,
               workspaceDirectory,
-              sessionResumeContentPrefix,
+              sessionResumeRecordContentPrefix,
               sessionResumeToolFingerprint,
               sessionResumeSubagentFingerprint,
             );
@@ -2065,7 +2072,7 @@ async function ensureCursorProxyServer(workspaceDirectory: string, toolRouter?: 
               warnIfResumeNotCaptured(
                 sessionResumeKey,
                 sessionResumeKeyHashNode,
-                sessionResumeContentPrefix,
+                sessionResumeRecordContentPrefix,
                 sessionResumeToolFingerprint,
                 sessionResumeSubagentFingerprint,
                 model,

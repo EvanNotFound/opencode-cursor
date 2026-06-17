@@ -83,6 +83,49 @@ export function deriveConversationAnchor(
   return undefined;
 }
 
+/**
+ * Prefixes used to validate a resume cache entry as a conversation advances.
+ *
+ * The session key intentionally remains based on the first real user message so
+ * turn 2 can find the chat ID recorded after turn 1. The content prefix is the
+ * safety check: lookup uses the prior user-message sequence, while recording
+ * stores the current user-message sequence for the next request. If two chats
+ * share the same opener but diverge later, the mismatch drops resume instead of
+ * attaching to the wrong cursor-agent chat.
+ */
+export function deriveConversationResumePrefixes(
+  messages: Array<ProxyMessage>,
+): { lookupContentPrefix: string; recordContentPrefix: string } | undefined {
+  const users: Array<{ canonical: string; prefix: string; index: number }> = [];
+  for (let index = 0; index < messages.length; index++) {
+    const message = messages[index];
+    if (message?.role !== "user") continue;
+    const text = extractTextContent(message.content).trim();
+    if (!text || isMetaUserMessage(text)) continue;
+    users.push({
+      canonical: canonicalizeContentForAnchor(message.content),
+      prefix: text.slice(0, 500),
+      index,
+    });
+  }
+  if (users.length === 0) return undefined;
+
+  const lastUserIsLatestMessage = users[users.length - 1]?.index === messages.length - 1;
+  const lookupUsers = lastUserIsLatestMessage && users.length > 1
+    ? users.slice(0, -1)
+    : users;
+
+  return {
+    lookupContentPrefix: buildUserSequencePrefix(lookupUsers),
+    recordContentPrefix: buildUserSequencePrefix(users),
+  };
+}
+
+function buildUserSequencePrefix(users: Array<{ canonical: string; prefix: string }>): string {
+  if (users.length === 1) return users[0].prefix;
+  return `users:${users.length}:${simpleHash(users.map((user) => user.canonical).join("\n\0\n"))}`;
+}
+
 /** Canonical serialization of message content for anchor hashing.
  *  Includes text and non-text parts so identical text with different images
  *  do not collide. A pure-text array produces the same canonical form as a
@@ -144,15 +187,11 @@ export function getResumeChatId(
     return undefined;
   }
   if (expectedPrefix != null && entry.contentPrefix !== expectedPrefix) {
-    evictEntry(
-      sessionKey,
-      "contentPrefixMismatch",
-      {
-        storedPrefixLength: entry.contentPrefix.length,
-        expectedPrefixLength: expectedPrefix.length,
-      },
-      "warn",
-    );
+    log.warn("Skipping session resume entry due to content prefix mismatch", {
+      sessionKeyHash: sanitizeSessionKey(sessionKey),
+      storedPrefixLength: entry.contentPrefix.length,
+      expectedPrefixLength: expectedPrefix.length,
+    });
     return undefined;
   }
   if ((toolFingerprint || entry.toolFingerprint) && entry.toolFingerprint !== toolFingerprint) {

@@ -229,11 +229,11 @@ describe("session-resume", () => {
     }
   });
 
-  it("treats prefix mismatch as a cache miss and evicts the stale entry", () => {
+  it("treats prefix mismatch as a cache miss without evicting another branch", () => {
     const key = buildSessionKey("/workspace", "gpt-5", "abc123");
     recordResumeChatId(key, "chat-uuid-1", "hello");
     expect(getResumeChatId(key, "different")).toBeUndefined();
-    expect(getResumeChatId(key)).toBeUndefined();
+    expect(getResumeChatId(key, "hello")).toBe("chat-uuid-1");
   });
 
   it("evicts entry on tool fingerprint mismatch", () => {
