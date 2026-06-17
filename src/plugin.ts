@@ -83,6 +83,7 @@ import {
   type ToolLoopGuard,
 } from "./provider/tool-loop-guard.js";
 import { createSdkBunChild, createSdkNodeChild } from "./client/sdk-child.js";
+import { createCursorAgentPoolNodeChild, isAgentPoolEnabled } from "./client/cursor-agent-child.js";
 import {
   parseCursorBackendPreference,
   resolveSdkApiKey,
@@ -571,6 +572,20 @@ function createNodeChildForBackend(input: {
       model: input.model,
       prompt: input.prompt,
       cwd: input.workspaceDirectory,
+    });
+  }
+
+  if (isAgentPoolEnabled()) {
+    log.debug("Using cursor-agent pool for request", {
+      model: input.model,
+      resume: !!input.resumeChatId,
+    });
+    return createCursorAgentPoolNodeChild({
+      model: input.model,
+      prompt: input.prompt,
+      cwd: input.workspaceDirectory,
+      resumeChatId: input.resumeChatId,
+      force: FORCE_TOOL_MODE,
     });
   }
 
