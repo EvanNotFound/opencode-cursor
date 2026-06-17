@@ -14,14 +14,16 @@ export function _resetToolSchemaCache(): void {
 
 export function buildToolFingerprint(tools: Array<any>): string {
   if (tools.length === 0) return "";
-  // Include names + descriptions + parameter key counts to detect schema changes
-  // without the cost of full JSON.stringify on every request.
+  // Include names + descriptions + parameter names + required fields to detect
+  // schema changes without the cost of full JSON.stringify on every request.
   const parts = tools.map((t: any) => {
     const fn = t.function || t;
     const name = fn.name || "?";
     const desc = fn.description || "";
-    const paramKeys = fn.parameters ? Object.keys(fn.parameters.properties || {}).length : 0;
-    return `${name}:${desc.length}:${paramKeys}`;
+    const paramProps = fn.parameters?.properties || {};
+    const paramKeys = Object.keys(paramProps).sort().join(",");
+    const required = (fn.parameters?.required || []).sort().join(",");
+    return `${name}:${desc.length}:${paramKeys}:${required}`;
   });
   parts.sort();
   return `${parts.length}:${parts.join("|")}`;
