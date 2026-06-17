@@ -340,12 +340,19 @@ export function resolvePromptForBackend(input: {
 
   const incremental = buildIncrementalPrompt(input.messages);
   if (incremental) {
-    log.debug("Using incremental prompt with session resume", {
-      sessionKeyHash,
-      resumeChatIdHash,
-      promptChars: incremental.length,
-      fullPromptChars: getFullPrompt().length,
-    });
+    // Guard the debug log behind isDebugEnabled() so getFullPrompt() is not
+    // eagerly evaluated on the incremental hot path. JS evaluates call
+    // arguments before log.debug's own level check runs, so without this
+    // guard the full prompt would be built on every resumed turn and negate
+    // M3's skip-full-flattening optimization. Mirrors buildPromptFromMessages.
+    if (log.isDebugEnabled()) {
+      log.debug("Using incremental prompt with session resume", {
+        sessionKeyHash,
+        resumeChatIdHash,
+        promptChars: incremental.length,
+        fullPromptChars: getFullPrompt().length,
+      });
+    }
     return { prompt: incremental, resumeChatId, sessionKey, usedIncremental: true, contentPrefix, toolFingerprint, subagentFingerprint };
   }
 
