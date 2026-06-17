@@ -6,8 +6,6 @@ import * as os from "node:os";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
-const LOG_DIR = path.join(os.homedir(), ".opencode-cursor");
-const LOG_FILE = path.join(LOG_DIR, "plugin.log");
 const MAX_LOG_SIZE = 5 * 1024 * 1024;
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
@@ -63,6 +61,15 @@ let logFileError = false;
 let logStream: fs.WriteStream | null = null;
 let logBytesWritten = 0;
 
+function getLogDir(): string {
+  const override = process.env.CURSOR_ACP_LOG_DIR?.trim();
+  return override || path.join(os.homedir(), ".opencode-cursor");
+}
+
+function getLogFile(): string {
+  return path.join(getLogDir(), "plugin.log");
+}
+
 /** Reset internal state (for testing only) */
 export function _resetLoggerState(): void {
   logDirEnsured = false;
@@ -77,8 +84,9 @@ export function _resetLoggerState(): void {
 function ensureLogDir(): void {
   if (logDirEnsured) return;
   try {
-    if (!fs.existsSync(LOG_DIR)) {
-      fs.mkdirSync(LOG_DIR, { recursive: true });
+    const logDir = getLogDir();
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
     }
     logDirEnsured = true;
   } catch {
@@ -94,15 +102,15 @@ function openLogStream(): void {
   try {
     // Seed byte counter from existing file size
     try {
-      logBytesWritten = fs.statSync(LOG_FILE).size;
+      logBytesWritten = fs.statSync(getLogFile()).size;
     } catch {
       logBytesWritten = 0;
     }
-    logStream = fs.createWriteStream(LOG_FILE, { flags: "a" });
+    logStream = fs.createWriteStream(getLogFile(), { flags: "a" });
     logStream.on("error", () => {
       if (!logFileError) {
         logFileError = true;
-        console.error(`[cursor-acp] Failed to write logs. Using: ${LOG_FILE}`);
+        console.error(`[cursor-acp] Failed to write logs. Using: ${getLogFile()}`);
       }
       logStream = null;
     });
@@ -118,7 +126,8 @@ function rotateIfNeeded(): void {
       logStream.end();
       logStream = null;
     }
-    fs.renameSync(LOG_FILE, LOG_FILE + ".1");
+    const logFile = getLogFile();
+    fs.renameSync(logFile, logFile + ".1");
     logBytesWritten = 0;
     openLogStream();
   } catch {

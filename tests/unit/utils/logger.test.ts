@@ -78,6 +78,23 @@ describe("logger", () => {
       consoleSpy.mockRestore();
     });
 
+    it("honors CURSOR_ACP_LOG_DIR for verification and sandboxed runs", () => {
+      process.env.CURSOR_ACP_LOG_DIR = "/tmp/open-cursor-logs";
+      mockedFs.existsSync.mockReturnValue(false);
+
+      const log = createLogger("test");
+      log.info("test message");
+
+      expect(mockedFs.mkdirSync).toHaveBeenCalledWith(
+        "/tmp/open-cursor-logs",
+        { recursive: true },
+      );
+      expect(mockedFs.createWriteStream).toHaveBeenCalledWith(
+        "/tmp/open-cursor-logs/plugin.log",
+        { flags: "a" },
+      );
+    });
+
     it("writes to console only when CURSOR_ACP_LOG_CONSOLE=1", () => {
       process.env.CURSOR_ACP_LOG_CONSOLE = "1";
       mockedFs.existsSync.mockReturnValue(true);
