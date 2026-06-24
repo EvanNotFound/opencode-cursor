@@ -1,10 +1,10 @@
-# Publishing `@rama_nigg/open-cursor`
+# Publishing `@evanovation/open-cursor`
 
-This project is publishable as the npm package `@rama_nigg/open-cursor`. The binary entrypoint is `open-cursor` (`dist/cli/opencode-cursor.js`).
+This project is publishable as the npm package `@evanovation/open-cursor`. The binary entrypoint is `open-cursor` (`dist/cli/opencode-cursor.js`).
 
 ## Prerequisites
 
-- npm account with publish access for `@rama_nigg/open-cursor`
+- npm account with publish access for `@evanovation/open-cursor`
 - `NPM_TOKEN` configured in GitHub Actions repository secrets
 - Clean `main` branch with passing CI
 
@@ -22,7 +22,7 @@ This project is publishable as the npm package `@rama_nigg/open-cursor`. The bin
 3. Confirm package contents:
    - `npm pack --dry-run`
 4. Confirm target version is not already published:
-   - `npm view @rama_nigg/open-cursor version`
+   - `npm view @evanovation/open-cursor version`
 5. Commit and push the version bump to `main`.
 6. Create and push a release tag:
    - `git tag vX.Y.Z`

@@ -16,7 +16,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const npmPackage = "@rama_nigg/open-cursor"
+const npmPackage = "@evanovation/open-cursor"
+const npmPackageScopeDir = "@evanovation"
 
 func parseCursorModelsOutput(clean string) (map[string]interface{}, error) {
 	// More permissive regex: allows uppercase, underscores, and various separators
@@ -203,7 +204,7 @@ func buildPlugin(m *model) error {
 			rootOut, rootErr := rootCmd.Output()
 			if rootErr == nil {
 				root := strings.TrimSpace(string(rootOut))
-				entry := filepath.Join(root, "@rama_nigg", "open-cursor", "dist", "plugin-entry.js")
+				entry := filepath.Join(root, npmPackageScopeDir, "open-cursor", "dist", "plugin-entry.js")
 				if info, err := os.Stat(entry); err == nil && info.Size() > 0 {
 					m.pluginEntry = entry
 					return nil
@@ -212,7 +213,7 @@ func buildPlugin(m *model) error {
 		}
 		// If npm install failed, continue to bun fallback; log only in debug mode.
 		if m.debugMode && m.logFile != nil {
-			m.logFile.WriteString("npm install @rama_nigg/open-cursor failed or plugin entry not found; falling back to bun build\n")
+			m.logFile.WriteString("npm install @evanovation/open-cursor failed or plugin entry not found; falling back to bun build\n")
 		}
 	}
 

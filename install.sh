@@ -2,7 +2,7 @@
 set -e
 
 # OpenCode-Cursor one-line installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/Nomadcxx/opencode-cursor/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/EvanNotFound/opencode-cursor/main/install.sh | bash
 # Prefer npm if available (easiest upgrades). Otherwise:
 # - With Go: runs TUI installer from source.
 # - Without Go: runs shell-only install from source (bun + cursor-agent required).
@@ -20,11 +20,11 @@ fi
 PLUGIN_DIR="${CONFIG_HOME}/opencode/plugin"
 CONFIG_PATH="${CONFIG_HOME}/opencode/opencode.json"
 
-NPM_PKG="@rama_nigg/open-cursor"
+NPM_PKG="@evanovation/open-cursor"
 
 # If npm is available, install/upgrade the published package and run its installer.
 # This produces a plugin symlink pointing at the globally-installed package, so
-# upgrading later is just: npm update -g @rama_nigg/open-cursor
+# upgrading later is just: npm update -g @evanovation/open-cursor
 if command -v npm &>/dev/null; then
     echo "npm detected; installing via npm package (${NPM_PKG})..."
     echo ""
@@ -78,7 +78,7 @@ if command -v go &>/dev/null; then
             exit 1
         fi
     else
-        if ! git clone --depth 1 https://github.com/Nomadcxx/opencode-cursor.git .; then
+        if ! git clone --depth 1 https://github.com/EvanNotFound/opencode-cursor.git .; then
             echo "Error: git clone failed. Check your network connection and GitHub access."
             exit 1
         fi
@@ -124,7 +124,7 @@ else
     fi
 
     echo "Updating config..."
-    NPM_PLUGIN="@rama_nigg/open-cursor@latest"
+    NPM_PLUGIN="@evanovation/open-cursor@latest"
     if [ -f "$CONFIG_PATH" ]; then
         CONFIG_BACKUP="${CONFIG_PATH}.bak.$(date +%Y%m%d-%H%M%S)"
         if ! cp "$CONFIG_PATH" "$CONFIG_BACKUP"; then
@@ -149,7 +149,7 @@ else
             }) | .plugin = ((.plugin // []) |
                 if index("cursor-acp") then
                     .
-                elif map(select(startswith("@rama_nigg/open-cursor"))) | length > 0 then
+                elif map(select(startswith("@evanovation/open-cursor"))) | length > 0 then
                     .
                 else
                     . + [$npmPlugin]
@@ -173,7 +173,7 @@ else
         }
         c.plugin=c.plugin||[];
         const hasCursorAcp=c.plugin.includes('cursor-acp');
-        const hasNpmPlugin=c.plugin.some(x=>typeof x==='string'&&x.startsWith('@rama_nigg/open-cursor'));
+        const hasNpmPlugin=c.plugin.some(x=>typeof x==='string'&&x.startsWith('@evanovation/open-cursor'));
         if(!hasCursorAcp&&!hasNpmPlugin)c.plugin.push(npmPlugin);
         c.provider=c.provider||{};
         c.provider['cursor-acp']={...(c.provider['cursor-acp']||{}),name:'Cursor',npm:'@ai-sdk/openai-compatible',options:{baseURL:'http://127.0.0.1:32124/v1'}};

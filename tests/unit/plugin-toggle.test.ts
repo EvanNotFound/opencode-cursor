@@ -15,11 +15,11 @@ describe("plugin toggle", () => {
   });
 
   it("enables plugin when plugin array includes npm package name", () => {
-    expect(isCursorPluginEnabledInConfig({ plugin: ["@rama_nigg/open-cursor"] })).toBe(true);
+    expect(isCursorPluginEnabledInConfig({ plugin: ["@evanovation/open-cursor"] })).toBe(true);
   });
 
   it("enables plugin when plugin array includes npm package name with version", () => {
-    expect(isCursorPluginEnabledInConfig({ plugin: ["@rama_nigg/open-cursor@2.3.2"] })).toBe(true);
+    expect(isCursorPluginEnabledInConfig({ plugin: ["@evanovation/open-cursor@2.3.2"] })).toBe(true);
   });
 
   it("disables plugin when plugin array excludes cursor-acp", () => {

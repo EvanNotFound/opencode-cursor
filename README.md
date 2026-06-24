@@ -14,12 +14,12 @@ No prompt limits. No broken streams. Full thinking + tool support in OpenCode. Y
 
 **Linux & macOS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Nomadcxx/opencode-cursor/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/EvanNotFound/opencode-cursor/main/install.sh | bash
 ```
 
 **Windows:**
 ```powershell
-npm install -g @rama_nigg/open-cursor
+npm install -g @evanovation/open-cursor
 open-cursor install
 ```
 
@@ -32,11 +32,11 @@ opencode models | grep cursor-acp
 ### Option B — npm global + CLI
 
 ```bash
-npm install -g @rama_nigg/open-cursor
+npm install -g @evanovation/open-cursor
 open-cursor install
 ```
 
-Upgrade: `npm update -g @rama_nigg/open-cursor`
+Upgrade: `npm update -g @evanovation/open-cursor`
 
 <details>
 <summary><b>Option C</b> — Add to opencode.json</summary>
@@ -45,7 +45,7 @@ Add to `~/.config/opencode/opencode.json` (or `%USERPROFILE%\.config\opencode\op
 
 ```json
 {
-  "plugin": ["@rama_nigg/open-cursor@latest"],
+  "plugin": ["@evanovation/open-cursor@latest"],
   "provider": {
     "cursor-acp": {
       "name": "Cursor ACP",
@@ -104,7 +104,7 @@ Add to `~/.config/opencode/opencode.json` (or `%USERPROFILE%\.config\opencode\op
 <summary><b>Option D</b> — Go TUI installer</summary>
 
 ```bash
-git clone https://github.com/Nomadcxx/opencode-cursor.git
+git clone https://github.com/EvanNotFound/opencode-cursor.git
 cd opencode-cursor
 go build -o ./installer ./cmd/installer && ./installer
 ```
@@ -114,7 +114,7 @@ go build -o ./installer ./cmd/installer && ./installer
 <summary><b>Option E</b> — LLM paste</summary>
 
 ```
-Install open-cursor for OpenCode: edit ~/.config/opencode/opencode.json, add "@rama_nigg/open-cursor@latest" to "plugin", add a "cursor-acp" provider with npm "@ai-sdk/openai-compatible" and a baseURL of http://127.0.0.1:32124/v1. Populate models by running `open-cursor sync-models --variants --compact` after install (or copy the model list from the README). Auth: `cursor-agent login`. Verify: `opencode models | grep cursor-acp`.
+Install open-cursor for OpenCode: edit ~/.config/opencode/opencode.json, add "@evanovation/open-cursor@latest" to "plugin", add a "cursor-acp" provider with npm "@ai-sdk/openai-compatible" and a baseURL of http://127.0.0.1:32124/v1. Populate models by running `open-cursor sync-models --variants --compact` after install (or copy the model list from the README). Auth: `cursor-agent login`. Verify: `opencode models | grep cursor-acp`.
 ```
 </details>
 
@@ -122,7 +122,7 @@ Install open-cursor for OpenCode: edit ~/.config/opencode/opencode.json, add "@r
 <summary><b>Option F</b> — Development (from source)</summary>
 
 ```bash
-git clone https://github.com/Nomadcxx/opencode-cursor.git
+git clone https://github.com/EvanNotFound/opencode-cursor.git
 cd opencode-cursor
 ./scripts/install-plugin.sh
 ```

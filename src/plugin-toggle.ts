@@ -3,7 +3,7 @@ import { homedir } from "os";
 import { join, resolve } from "path";
 
 const CURSOR_PROVIDER_ID = "cursor-acp";
-const NPM_PACKAGE_NAME = "@rama_nigg/open-cursor";
+const NPM_PACKAGE_NAME = "@evanovation/open-cursor";
 
 function matchesPlugin(entry: string): boolean {
   if (entry === CURSOR_PROVIDER_ID) return true;

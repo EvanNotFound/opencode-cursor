@@ -388,7 +388,7 @@ type SyncModelsJsonResult = SyncModelsResult & {
 };
 
 const PROVIDER_ID = "cursor-acp";
-const NPM_PACKAGE_PREFIX = "@rama_nigg/open-cursor";
+const NPM_PACKAGE_PREFIX = "@evanovation/open-cursor";
 const DEFAULT_BASE_URL = "http://127.0.0.1:32124/v1";
 
 function printHelp() {
@@ -831,7 +831,7 @@ function printSyncResult(result: SyncModelsResult, options: Options) {
   console.log(`  Skipped: ${result.summary.skipped}`);
 }
 
-const NPM_PACKAGE = "@rama_nigg/open-cursor";
+const NPM_PACKAGE = "@evanovation/open-cursor";
 
 function commandUninstall(options: Options) {
   const { configPath, pluginPath } = resolvePaths(options);
@@ -840,7 +840,7 @@ function commandUninstall(options: Options) {
   if (existsSync(configPath)) {
     const config = readConfig(configPath);
     if (Array.isArray(config.plugin)) {
-      // Remove both cursor-acp (symlink) and @rama_nigg/open-cursor (npm-direct) entries
+      // Remove both cursor-acp (symlink) and @evanovation/open-cursor (npm-direct) entries
       config.plugin = config.plugin.filter((name: string) => {
         if (name === PROVIDER_ID) return false;
         if (typeof name === "string" && name.startsWith(NPM_PACKAGE)) return false;

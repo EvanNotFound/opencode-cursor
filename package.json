@@ -1,6 +1,6 @@
 {
-  "name": "@rama_nigg/open-cursor",
-  "version": "2.4.14",
+  "name": "@evanovation/open-cursor",
+  "version": "2.4.14-native.0",
   "description": "No prompt limits. No broken streams. Full thinking + tool support. Your Cursor subscription, properly integrated.",
   "type": "module",
   "main": "dist/plugin-entry.js",
@@ -64,11 +64,11 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Nomadcxx/opencode-cursor.git"
+    "url": "git+https://github.com/EvanNotFound/opencode-cursor.git"
   },
-  "homepage": "https://github.com/Nomadcxx/opencode-cursor#readme",
+  "homepage": "https://github.com/EvanNotFound/opencode-cursor#readme",
   "bugs": {
-    "url": "https://github.com/Nomadcxx/opencode-cursor/issues"
+    "url": "https://github.com/EvanNotFound/opencode-cursor/issues"
   },
   "keywords": [
     "opencode",
@@ -78,5 +78,5 @@
     "plugin",
     "cursor-agent"
   ],
-  "author": "Nomadcxx"
+  "author": "EvanNotFound"
 }
