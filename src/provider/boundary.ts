@@ -12,7 +12,7 @@ export type ProviderBoundaryMode = "legacy" | "v1";
 
 export type ToolOptionResolution = {
   tools: unknown;
-  action: "preserve" | "fallback" | "override" | "none";
+  action: "preserve" | "override" | "none";
 };
 
 export interface ToolLoopFlags {
@@ -90,9 +90,6 @@ function createSharedBoundary(
       if (toolLoopMode === "opencode") {
         if (existingTools != null) {
           return { tools: existingTools, action: "preserve" };
-        }
-        if (refreshedTools.length > 0) {
-          return { tools: refreshedTools, action: "fallback" };
         }
         return { tools: existingTools, action: "none" };
       }

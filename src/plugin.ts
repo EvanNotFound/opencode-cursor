@@ -2521,13 +2521,18 @@ export const CursorPlugin: Plugin = async ({ $, directory, worktree, client, ser
   // Auto-refresh model list from cursor-agent (non-blocking, fire-and-forget)
   autoRefreshModels().catch(() => {});
 
-  // MCP tool bridge: connect to MCP servers and register their tools.
-  // We await init so tools are available before the plugin returns its tool hook.
+  // Tools (skills) discovery/execution wiring. In native OpenCode mode this
+  // plugin stays provider-only: OpenCode owns built-in tools and MCP.
+  const toolsEnabled = process.env.CURSOR_ACP_ENABLE_OPENCODE_TOOLS !== "false"; // default ON
+  const legacyProxyToolPathsEnabled = toolsEnabled && TOOL_LOOP_MODE === "proxy-exec";
+
+  // MCP tool bridge: connect to MCP servers and register their tools only for
+  // legacy proxy execution. Native OpenCode mode already handles MCP itself.
   const mcpManager = new McpClientManager();
   let mcpToolEntries: Record<string, any> = {};
   let mcpToolDefs: any[] = [];
   let mcpToolSummaries: McpToolSummary[] = [];
-  const mcpEnabled = process.env.CURSOR_ACP_MCP_BRIDGE !== "false"; // default ON
+  const mcpEnabled = legacyProxyToolPathsEnabled && process.env.CURSOR_ACP_MCP_BRIDGE !== "false"; // default ON for legacy mode
 
   if (mcpEnabled) {
     try {
@@ -2568,9 +2573,6 @@ export const CursorPlugin: Plugin = async ({ $, directory, worktree, client, ser
   // Initialize toast service for MCP pass-through notifications
   toastService.setClient(client);
 
-  // Tools (skills) discovery/execution wiring
-  const toolsEnabled = process.env.CURSOR_ACP_ENABLE_OPENCODE_TOOLS !== "false"; // default ON
-  const legacyProxyToolPathsEnabled = toolsEnabled && TOOL_LOOP_MODE === "proxy-exec";
   if (toolsEnabled && TOOL_LOOP_MODE === "opencode") {
     log.debug("OpenCode mode active; skipping legacy SDK/MCP discovery and proxy-side tool execution");
   } else if (toolsEnabled && TOOL_LOOP_MODE === "off") {
@@ -2684,8 +2686,11 @@ export const CursorPlugin: Plugin = async ({ $, directory, worktree, client, ser
   const proxyBaseURL = await ensureCursorProxyServer(workspaceDirectory, router);
   log.debug("Proxy server started", { baseURL: proxyBaseURL });
 
-  // Build tool hook entries from local registry
-  const toolHookEntries = buildToolHookEntries(localRegistry, workspaceDirectory);
+  // In native OpenCode mode, let OpenCode own its built-in tools so desktop
+  // renderers keep seeing edit/write/apply_patch instead of plugin aliases.
+  const toolHookEntries = legacyProxyToolPathsEnabled
+    ? buildToolHookEntries(localRegistry, workspaceDirectory)
+    : {};
 
   return {
     tool: { ...toolHookEntries, ...mcpToolEntries },
@@ -2734,19 +2739,19 @@ export const CursorPlugin: Plugin = async ({ $, directory, worktree, client, ser
 
       // Tool definitions handling:
       // - proxy-exec mode: provider injects tool definitions directly.
-      // - opencode mode: preserve OpenCode-provided tools, fallback only when absent.
+      // - opencode mode: preserve OpenCode-provided tools and do not advertise
+      //   local aliases like oc_edit/oc_write over native edit/apply_patch.
       if (toolsEnabled) {
         try {
           const existingTools = output.options.tools;
           const shouldRefresh =
-            TOOL_LOOP_MODE === "proxy-exec"
-            || (TOOL_LOOP_MODE === "opencode" && existingTools == null);
+            TOOL_LOOP_MODE === "proxy-exec";
           const refreshedTools = shouldRefresh ? await refreshTools() : [];
           const resolved = boundaryContext.run("resolveChatParamTools", (boundary) =>
             boundary.resolveChatParamTools(TOOL_LOOP_MODE, existingTools, refreshedTools),
           );
 
-          if (resolved.action === "override" || resolved.action === "fallback") {
+          if (resolved.action === "override") {
             output.options.tools = resolved.tools;
           } else if (resolved.action === "preserve") {
             const count = Array.isArray(existingTools) ? existingTools.length : 0;
@@ -2778,9 +2783,13 @@ export const CursorPlugin: Plugin = async ({ $, directory, worktree, client, ser
 
     async "experimental.chat.system.transform"(input: any, output: { system: string[] }) {
       if (!toolsEnabled) return;
+      if (TOOL_LOOP_MODE !== "proxy-exec") return;
       const subagentNames = readSubagentNames();
       const systemMessage = buildAvailableToolsSystemMessage(
-        lastToolNames, lastToolMap, mcpToolDefs, mcpToolSummaries,
+        lastToolNames,
+        lastToolMap,
+        mcpToolDefs,
+        mcpToolSummaries,
         subagentNames,
       );
       if (!systemMessage) return;

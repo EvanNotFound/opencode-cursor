@@ -10,12 +10,12 @@ describe("resolveChatParamTools", () => {
     expect(resolved.tools).toBe(existing);
   });
 
-  it("uses fallback tools in opencode mode when missing", () => {
+  it("does not fallback to local tools in opencode mode when missing", () => {
     const fallback = [{ function: { name: "oc_bash" } }];
     const resolved = resolveChatParamTools("opencode", undefined, fallback);
 
-    expect(resolved.action).toBe("fallback");
-    expect(resolved.tools).toBe(fallback);
+    expect(resolved.action).toBe("none");
+    expect(resolved.tools).toBeUndefined();
   });
 
   it("overrides with refreshed tools in proxy-exec mode", () => {
