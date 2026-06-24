@@ -132,29 +132,11 @@ Verify: `opencode models | grep cursor-acp`
 
 ## Authentication
 
-Most users:
 ```bash
 cursor-agent login
 ```
 
-Or via OpenCode:
-```bash
-opencode auth login --provider cursor-acp
-```
-
-<details>
-<summary><b>SDK backend auth</b> (only if using <code>CURSOR_ACP_BACKEND=sdk</code> or SDK fallback)</summary>
-
-Set a real Cursor API key from [cursor.com/settings](https://cursor.com/settings):
-
-```bash
-export CURSOR_API_KEY=<your-api-key>
-```
-
-Other supported methods (priority order): OpenCode auth store (`opencode auth login --provider cursor-acp`), or `apiKey` in the `cursor-acp` provider options in `opencode.json`.
-
-Do not use the historical `cursor-agent` placeholder string as an SDK key.
-</details>
+`open-cursor` uses Cursor's official `cursor-agent` CLI only. It does not use a Cursor API key or SDK backend.
 
 ## Usage
 
@@ -163,58 +145,27 @@ opencode run "your prompt" --model cursor-acp/auto
 opencode run "your prompt" --model cursor-acp/sonnet-4.5
 ```
 
-## MCP Tool Bridge
-
-Any MCP servers already configured in your `opencode.json` work automatically with cursor-acp models — no extra setup needed. The plugin discovers them at startup and injects usage instructions into the system prompt so the model calls them via cursor-agent's Shell tool.
-
-`mcptool` is a shell CLI, so opencode applies your `bash` permission rules to `mcptool call ...`. If you rely on MCP tools asking for confirmation, keep `bash` as `ask` or add explicit `ask`/`deny` rules for `mcptool call *`.
-
-```bash
-mcptool servers                                    # list discovered servers
-mcptool tools [server]                             # list available tools
-mcptool call hybrid-memory memory_stats            # call a tool manually
-mcptool call playwright browser_navigate '{"url":"https://example.com"}'
-```
-
-Any MCP server using stdio transport works. Tested with hybrid-memory, @modelcontextprotocol/server-filesystem, @playwright/mcp, and @modelcontextprotocol/server-everything.
-
 ## Architecture
 
 ```mermaid
 flowchart TB
     OC["OpenCode"] --> SDK["@ai-sdk/openai-compatible"]
     SDK -->|"POST /v1/chat/completions"| PROXY["open-cursor proxy :32124"]
-    PROXY -->|"spawn persistent"| RUNNER["Node runner: sdk-runner.mjs"]
-    RUNNER -->|"stdin: {model, prompt, cwd}"| CURSORSDK["@cursor/sdk Agent.create + send()"]
-    CURSORSDK -->|"HTTPS"| CURSOR["Cursor API"]
-    CURSOR --> CURSORSDK
-
-    CURSORSDK -->|"stdout: NDJSON StreamJsonEvent"| PARSER["Parse + convert to SSE"]
+    PROXY -->|"spawn"| AGENT["cursor-agent --print --output-format stream-json"]
+    AGENT -->|"stdout: NDJSON StreamJsonEvent"| PARSER["Parse + convert to SSE"]
     PARSER -->|"assistant / thinking events"| SSE["SSE content chunks"]
-    PARSER -->|"tool_call event"| BOUNDARY["Provider boundary (v1 default)"]
-    BOUNDARY --> COMPAT["Schema compat + alias normalization"]
-    COMPAT --> GUARD["Tool-loop guard"]
-    GUARD -->|"emit tool_calls + finish_reason=tool_calls"| SDK
+    PARSER -->|"tool_call event"| SDK
     SDK --> OC
 
     OC -->|"execute tool locally"| TOOLRUN["OpenCode tool runtime"]
     TOOLRUN -->|"next request includes role:tool result"| SDK
-    SDK -->|"TOOL_RESULT prompt block"| RUNNER
-
-    RUNNER -->|"Shell tool_call"| MCPTOOL["mcptool CLI"]
-    MCPTOOL -->|"stdio"| MCP["MCP Servers"]
-    MCP --> MCPTOOL
-    MCPTOOL --> RUNNER
+    SDK -->|"TOOL_RESULT prompt block"| AGENT
 ```
 
 <details>
 <summary><b>How the proxy works</b></summary>
 
-The proxy uses a dual-backend runtime. In `auto` mode (default) it prefers the `cursor-agent` binary when available. If `cursor-agent` is unavailable and a real Cursor API key is configured, or if `CURSOR_ACP_BACKEND=sdk` is set, a persistent Node.js child process (`scripts/sdk-runner.mjs`) runs `@cursor/sdk` on behalf of the proxy.
-
-By default, the SDK Agent runs in isolated mode (`settingSources: []`). To load Cursor environment settings in SDK mode, set `CURSOR_ACP_SETTING_SOURCES=all`.
-
-Default tool-loop mode: `CURSOR_ACP_TOOL_LOOP_MODE=opencode`. Details: [docs/architecture/runtime-tool-loop.md](docs/architecture/runtime-tool-loop.md).
+The proxy starts `cursor-agent` for each request, converts stream-json output to OpenAI-compatible responses, and forwards tool-call events back to OpenCode. OpenCode executes its native tools, so patch previews and permission handling stay native.
 
 Startup model refresh is additive by default. Use `CURSOR_ACP_MODEL_AUTO_REFRESH=false` to disable it, or `CURSOR_ACP_MODEL_AUTO_REFRESH=compact` to fold Cursor model variants into opencode variants.
 </details>
@@ -231,7 +182,6 @@ THERE is currently not a single perfect plugin for cursor in opencode, my advice
 | **Installer**     |     ✓ TUI + one-liner      |                                               ✗                                                |                                          ✗                                           |                                    ✗                                     |
 | **OAuth Flow**    |  ✓ OpenCode integration    |                                            ✓ Native                                            |                                    Browser login                                     |                                 Keychain                                 |
 | **Tool Calling**  | ✓ OpenCode-owned loop |                                            ✓ Native                                            |                                    ✓ Experimental                                    |                                    ✗                                     |
-| **MCP Bridge**    | ✓ mcptool CLI (any MCP server) |                                               ✗                                                |                                          ✗                                           |                                    ✗                                     |
 | **Stability**     | Stable (uses official CLI) |                                          Experimental                                          |                                        Stable                                        |                               Experimental                               |
 | **Dependencies**  |     bun, cursor-agent      |                                              npm                                               |                                  bun, cursor-agent                                   |                               Node.js 18+                                |
 | **Port**          |           32124            |                                             18741                                              |                                        32123                                         |                                   4141                                   |
@@ -239,7 +189,6 @@ THERE is currently not a single perfect plugin for cursor in opencode, my advice
 ## Troubleshooting
 
 - `fetch() URL is invalid` or auth errors → `cursor-agent login` or `opencode auth login --provider cursor-acp`
-- `CURSOR_API_KEY not set` in SDK mode → set a real API key from [cursor.com/settings](https://cursor.com/settings), or use `CURSOR_ACP_BACKEND=auto` with a working `cursor-agent`
 - Model not responding → verify your API key/quota
 - Quota exceeded → [cursor.com/settings](https://cursor.com/settings)
 - Proxy not starting → ensure port 32124 is available
@@ -250,7 +199,7 @@ Debug logging: `CURSOR_ACP_LOG_LEVEL=debug opencode run "your prompt" --model cu
 
 ```mermaid
 flowchart LR
-    P1[/Stabilise/] --> P2[/MCP Bridge/] --> P3[/Simplify/] --> P4[/ACP + MCP/]
+    P1[/Stabilise/] --> P2[/Simplify/] --> P3[/ACP/]
 
     style P1 fill:#264653,stroke:#1d3557,color:#fff
     style P2 fill:#264653,stroke:#1d3557,color:#fff
@@ -259,11 +208,10 @@ flowchart LR
 ```
 
 [X] **Stabilise** — Clean up dead code, fix test isolation
-[X] **MCP Bridge** — Bridge MCP servers into Cursor models via `mcptool` CLI
-[ ] **Simplify** — Rip out serialisation layers
-[ ] **ACP + MCP** — Structured protocols end-to-end
+[X] **Simplify** — Provider-only cursor-agent backend with native OpenCode tools
+[ ] **ACP** — Structured protocol end-to-end if Cursor's ACP path becomes stable
 
-**ACP + MCP (deferred)** — End goal is a thin `OpenCode → Cursor ACP → MCP` plugin, not an evolved proxy. We ship the bridge until Cursor's ACP path passes MCP + headless approval re-validation. [Why and when →](docs/architecture/cursor-acp-mcp-future.md)
+**ACP (deferred)** — End goal is an even thinner `OpenCode → Cursor ACP` plugin once Cursor's ACP path is stable.
 
 ## License
 

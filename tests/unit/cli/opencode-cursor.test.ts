@@ -83,34 +83,18 @@ describe("cli/opencode-cursor commandDoctor", () => {
     expect(results.every(r => typeof r.passed === "boolean")).toBe(true);
   }, 10000);
 
-  it("reports missing cursor-agent as a warning when SDK backend has a real key", () => {
-    const originalBackend = process.env.CURSOR_ACP_BACKEND;
-    const originalApiKey = process.env.CURSOR_API_KEY;
+  it("reports missing cursor-agent as a failure", () => {
     const originalCursorAgent = process.env.CURSOR_AGENT_EXECUTABLE;
 
-    process.env.CURSOR_ACP_BACKEND = "sdk";
-    process.env.CURSOR_API_KEY = "cursor_123";
     process.env.CURSOR_AGENT_EXECUTABLE = "/definitely/missing/cursor-agent";
 
     try {
       const results = runDoctorChecks("/tmp/test-config.json", "/tmp/test-plugin");
       const cursorAgent = results.find((result) => result.name === "cursor-agent");
-      const sdkAuth = results.find((result) => result.name === "Cursor SDK API key");
 
       expect(cursorAgent?.passed).toBe(false);
-      expect(cursorAgent?.warning).toBe(true);
-      expect(sdkAuth?.passed).toBe(true);
+      expect(cursorAgent?.warning).toBeUndefined();
     } finally {
-      if (originalBackend === undefined) {
-        delete process.env.CURSOR_ACP_BACKEND;
-      } else {
-        process.env.CURSOR_ACP_BACKEND = originalBackend;
-      }
-      if (originalApiKey === undefined) {
-        delete process.env.CURSOR_API_KEY;
-      } else {
-        process.env.CURSOR_API_KEY = originalApiKey;
-      }
       if (originalCursorAgent === undefined) {
         delete process.env.CURSOR_AGENT_EXECUTABLE;
       } else {
@@ -147,19 +131,13 @@ describe("cli/opencode-cursor status", () => {
 
   it("reports runtime settings that affect request performance", () => {
     const originalEnv = {
-      CURSOR_ACP_AGENT_POOL: process.env.CURSOR_ACP_AGENT_POOL,
-      CURSOR_ACP_AGENT_POOL_IDLE_MS: process.env.CURSOR_ACP_AGENT_POOL_IDLE_MS,
       CURSOR_ACP_SESSION_RESUME: process.env.CURSOR_ACP_SESSION_RESUME,
-      CURSOR_ACP_BACKEND: process.env.CURSOR_ACP_BACKEND,
       CURSOR_ACP_LOG_LEVEL: process.env.CURSOR_ACP_LOG_LEVEL,
       CURSOR_ACP_LOG_CONSOLE: process.env.CURSOR_ACP_LOG_CONSOLE,
       CURSOR_ACP_LOG_DIR: process.env.CURSOR_ACP_LOG_DIR,
     };
 
-    process.env.CURSOR_ACP_AGENT_POOL = "1";
-    process.env.CURSOR_ACP_AGENT_POOL_IDLE_MS = "0";
     process.env.CURSOR_ACP_SESSION_RESUME = "yes";
-    process.env.CURSOR_ACP_BACKEND = "sdk";
     process.env.CURSOR_ACP_LOG_LEVEL = "debug";
     process.env.CURSOR_ACP_LOG_CONSOLE = "1";
     process.env.CURSOR_ACP_LOG_DIR = "/tmp/open-cursor-logs";
@@ -168,13 +146,6 @@ describe("cli/opencode-cursor status", () => {
       const result = getStatusResult("/tmp/test-config.json", "/tmp/test-plugin");
 
       expect(result.runtime).toEqual({
-        backend: {
-          preference: "sdk",
-        },
-        agentPool: {
-          enabled: true,
-          idleMs: 0,
-        },
         sessionResume: {
           enabled: true,
         },

@@ -29,9 +29,6 @@ reviews:
     - path: "src/proxy/**/*.ts"
       instructions: |
         Ensure streaming errors propagate and streams are destroyed on error.
-    - path: "src/tools/**/*.ts"
-      instructions: |
-        Validate inputs and add unit tests for new tools.
     - path: "cmd/**/*.go"
       instructions: |
         Handle context cancellation and return non-zero exit codes on fatal errors.

@@ -1,7 +1,7 @@
 /**
  * Non-blocking model auto-refresh for plugin startup.
  *
- * Discovers currently available models via the SDK runner and merges them
+ * Discovers currently available models via cursor-agent and merges them
  * into the opencode.json config. Only adds new models — never removes
  * user-configured ones. Safe to call fire-and-forget; all errors are
  * caught and logged silently.
@@ -11,8 +11,7 @@ import {
   readFileSync as nodeReadFileSync,
   writeFileSync as nodeWriteFileSync,
 } from "node:fs";
-import { listModelsViaRunner } from "../client/sdk-child.js";
-import { resolveSdkApiKey } from "../auth.js";
+import { discoverModelsFromCursorAgent } from "../cli/model-discovery.js";
 import { resolveOpenCodeConfigPath } from "../plugin-toggle.js";
 import { createLogger, type Logger } from "../utils/logger.js";
 import { mergeCursorModelEntries } from "./variants.js";
@@ -45,12 +44,7 @@ type AutoRefreshModelsDeps = {
 const defaultDeps: AutoRefreshModelsDeps = {
   defer: () => Promise.resolve(),
   discoverModels: async () => {
-    const apiKey = resolveSdkApiKey({ env: process.env });
-    if (!apiKey) {
-      throw new Error("CURSOR_API_KEY not set");
-    }
-    const models = await listModelsViaRunner(apiKey);
-    return models.map((m) => ({ id: m.id, name: m.name }));
+    return discoverModelsFromCursorAgent().map((m) => ({ id: m.id, name: m.name }));
   },
   env: process.env,
   existsSync: nodeExistsSync,
@@ -126,7 +120,7 @@ function getAutoRefreshMode(env: NodeJS.ProcessEnv): AutoRefreshMode {
  * Auto-refresh models at plugin startup.
  *
  * - Reads the current opencode.json config
- * - Queries the SDK runner for available models
+ * - Queries cursor-agent for available models
  * - Merges discovered models into the provider config
  * - Writes back if new models were added or compacted
  *
