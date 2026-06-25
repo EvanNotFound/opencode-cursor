@@ -1,217 +1,117 @@
-![header](docs/header.png)
+# open-cursor
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux" />
-  <img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS" />
-  <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows" />
-</p>
+Use Cursor subscription models in OpenCode.
 
-No prompt limits. No broken streams. Full thinking + tool support in OpenCode. Your Cursor subscription, properly integrated.
+This is a small OpenCode provider plugin. It runs Cursor's official `cursor-agent` CLI behind a local OpenAI-compatible proxy, so OpenCode can use models like:
 
-## Installation
+- `cursor-acp/auto`
+- `cursor-acp/sonnet-4.5`
+- `cursor-acp/gpt-5.5`
 
-### Option A — One-line installer
+## Why this exists
 
-**Linux & macOS:**
+This project is a spinoff of [Nomadcxx/opencode-cursor](https://github.com/Nomadcxx/opencode-cursor).
+
+Credit to that project for the original Cursor/OpenCode integration work.
+
+I am building this because I want the smallest useful version of the idea:
+
+- Cursor subscription models inside OpenCode
+- native OpenCode tools
+- native OpenCode patch previews
+- no custom `oc_*` tool bridge
+- no SDK backend
+- no MCP bridge
+- no extra compatibility layers
+
+The previous project became too broad and bloated for my use case. This one is intentionally narrower.
+
+## Requirements
+
+- OpenCode
+- Bun
+- Cursor CLI / `cursor-agent`
+- Cursor account logged in with:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EvanNotFound/opencode-cursor/main/install.sh | bash
+cursor-agent login
 ```
 
-**Windows:**
-```powershell
+## Install
+
+```bash
 npm install -g @evanovation/open-cursor
 open-cursor install
 ```
 
-Then authenticate and verify:
+Verify:
+
 ```bash
-cursor-agent login
 opencode models | grep cursor-acp
 ```
 
-### Option B — npm global + CLI
+## Use
 
 ```bash
-npm install -g @evanovation/open-cursor
-open-cursor install
+opencode run "hello" --model cursor-acp/auto
+opencode run "write a small script" --model cursor-acp/sonnet-4.5
 ```
 
-Upgrade: `npm update -g @evanovation/open-cursor`
-
-<details>
-<summary><b>Option C</b> — Add to opencode.json</summary>
-
-Add to `~/.config/opencode/opencode.json` (or `%USERPROFILE%\.config\opencode\opencode.json` on Windows):
-
-```json
-{
-  "plugin": ["@evanovation/open-cursor@latest"],
-  "provider": {
-    "cursor-acp": {
-      "name": "Cursor ACP",
-      "npm": "@ai-sdk/openai-compatible",
-      "options": {
-        "baseURL": "http://127.0.0.1:32124/v1"
-      },
-      "models": {
-        "cursor-acp/auto":              { "name": "Auto" },
-
-        "cursor-acp/claude-opus-4-7":   { "name": "Claude 4.7 Opus" },
-        "cursor-acp/claude-4.6-opus":   { "name": "Claude 4.6 Opus" },
-        "cursor-acp/claude-4.6-sonnet": { "name": "Claude 4.6 Sonnet" },
-        "cursor-acp/claude-4.5-opus":   { "name": "Claude 4.5 Opus" },
-        "cursor-acp/claude-4.5-sonnet": { "name": "Claude 4.5 Sonnet" },
-        "cursor-acp/claude-4.5-haiku":  { "name": "Claude 4.5 Haiku" },
-        "cursor-acp/claude-4-sonnet":   { "name": "Claude 4 Sonnet" },
-
-        "cursor-acp/gpt-5.5":           { "name": "GPT-5.5" },
-        "cursor-acp/gpt-5.4":           { "name": "GPT-5.4" },
-        "cursor-acp/gpt-5.4-mini":      { "name": "GPT-5.4 Mini" },
-        "cursor-acp/gpt-5.4-nano":      { "name": "GPT-5.4 Nano" },
-        "cursor-acp/gpt-5.3-codex":     { "name": "GPT-5.3 Codex" },
-        "cursor-acp/gpt-5.2":           { "name": "GPT-5.2" },
-        "cursor-acp/gpt-5.2-codex":     { "name": "GPT-5.2 Codex" },
-        "cursor-acp/gpt-5.1-codex":     { "name": "GPT-5.1 Codex" },
-        "cursor-acp/gpt-5.1-codex-max": { "name": "GPT-5.1 Codex Max" },
-        "cursor-acp/gpt-5.1-codex-mini":{ "name": "GPT-5.1 Codex Mini" },
-        "cursor-acp/gpt-5-mini":        { "name": "GPT-5 Mini" },
-
-        "cursor-acp/gemini-3.1-pro":    { "name": "Gemini 3.1 Pro" },
-        "cursor-acp/gemini-3-pro":      { "name": "Gemini 3 Pro" },
-        "cursor-acp/gemini-3-flash":    { "name": "Gemini 3 Flash" },
-
-        "cursor-acp/composer-2":        { "name": "Composer 2" },
-        "cursor-acp/composer-2-fast":   { "name": "Composer 2 Fast" },
-        "cursor-acp/composer-1.5":      { "name": "Composer 1.5" },
-
-        "cursor-acp/grok-4-20":         { "name": "Grok 4.20" },
-        "cursor-acp/kimi-k2.5":         { "name": "Kimi K2.5" }
-      }
-    }
-  }
-}
-```
-
-> **Refresh models anytime** with the bundled CLI:
-> ```bash
-> open-cursor sync-models                       # plain list
-> open-cursor sync-models --variants --compact  # group thinking / fast / -low/-high variants under each base
-> ```
-> The `--variants --compact` form is recommended — it folds dozens of `*-thinking-fast`, `*-high-fast`, etc. into a single entry per family with a `variants` map, and includes `cost` from the official Cursor pricing table so OpenCode TokenSpeed can render usage correctly.
-</details>
-
-<details>
-<summary><b>Option D</b> — Go TUI installer</summary>
+## Sync models
 
 ```bash
-git clone https://github.com/EvanNotFound/opencode-cursor.git
-cd opencode-cursor
-go build -o ./installer ./cmd/installer && ./installer
+open-cursor sync-models
 ```
-</details>
 
-<details>
-<summary><b>Option E</b> — LLM paste</summary>
-
-```
-Install open-cursor for OpenCode: edit ~/.config/opencode/opencode.json, add "@evanovation/open-cursor@latest" to "plugin", add a "cursor-acp" provider with npm "@ai-sdk/openai-compatible" and a baseURL of http://127.0.0.1:32124/v1. Populate models by running `open-cursor sync-models --variants --compact` after install (or copy the model list from the README). Auth: `cursor-agent login`. Verify: `opencode models | grep cursor-acp`.
-```
-</details>
-
-<details>
-<summary><b>Option F</b> — Development (from source)</summary>
+Optional compact model list:
 
 ```bash
-git clone https://github.com/EvanNotFound/opencode-cursor.git
-cd opencode-cursor
-./scripts/install-plugin.sh
+open-cursor sync-models --variants --compact
 ```
 
-Verify: `opencode models | grep cursor-acp`
-</details>
+## How it works
 
-## Authentication
+OpenCode talks to a local OpenAI-compatible proxy at:
 
-```bash
-cursor-agent login
+```txt
+http://127.0.0.1:32124/v1
 ```
 
-`open-cursor` uses Cursor's official `cursor-agent` CLI only. It does not use a Cursor API key or SDK backend.
+The proxy starts `cursor-agent`, converts Cursor stream-json output into OpenAI-compatible responses, and sends tool calls back to OpenCode.
 
-## Usage
-
-```bash
-opencode run "your prompt" --model cursor-acp/auto
-opencode run "your prompt" --model cursor-acp/sonnet-4.5
-```
-
-## Architecture
-
-```mermaid
-flowchart TB
-    OC["OpenCode"] --> SDK["@ai-sdk/openai-compatible"]
-    SDK -->|"POST /v1/chat/completions"| PROXY["open-cursor proxy :32124"]
-    PROXY -->|"spawn"| AGENT["cursor-agent --print --output-format stream-json"]
-    AGENT -->|"stdout: NDJSON StreamJsonEvent"| PARSER["Parse + convert to SSE"]
-    PARSER -->|"assistant / thinking events"| SSE["SSE content chunks"]
-    PARSER -->|"tool_call event"| SDK
-    SDK --> OC
-
-    OC -->|"execute tool locally"| TOOLRUN["OpenCode tool runtime"]
-    TOOLRUN -->|"next request includes role:tool result"| SDK
-    SDK -->|"TOOL_RESULT prompt block"| AGENT
-```
-
-<details>
-<summary><b>How the proxy works</b></summary>
-
-The proxy starts `cursor-agent` for each request, converts stream-json output to OpenAI-compatible responses, and forwards tool-call events back to OpenCode. OpenCode executes its native tools, so patch previews and permission handling stay native.
-
-Startup model refresh is additive by default. Use `CURSOR_ACP_MODEL_AUTO_REFRESH=false` to disable it, or `CURSOR_ACP_MODEL_AUTO_REFRESH=compact` to fold Cursor model variants into opencode variants.
-</details>
-
-## Alternatives
-THERE is currently not a single perfect plugin for cursor in opencode, my advice is stick with what is the LEAST worst option for you.
-|                   |        open-cursor         | [yet-another-opencode-cursor-auth](https://github.com/Yukaii/yet-another-opencode-cursor-auth) | [opencode-cursor-auth](https://github.com/POSO-PocketSolutions/opencode-cursor-auth) | [cursor-opencode-auth](https://github.com/R44VC0RP/cursor-opencode-auth) |
-| ----------------- | :------------------------: | :--------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------: | :----------------------------------------------------------------------: |
-| **Architecture**  | HTTP proxy via cursor-agent |                                       Direct Connect-RPC                                       |                             HTTP proxy via cursor-agent                              |                       Direct Connect-RPC/protobuf                        |
-| **Platform**      |   Linux, macOS, Windows    |                                      Linux, macOS                                           |                                     Linux, macOS                                     |                          macOS only (Keychain)                           |
-| **Max Prompt**    |   Unlimited (HTTP body)    |                                            Unknown                                             |                                   ~128KB (ARG_MAX)                                   |                                 Unknown                                  |
-| **Streaming**     |           ✓ SSE            |                                             ✓ SSE                                              |                                     Undocumented                                     |                                    ✓                                     |
-| **Error Parsing** |   ✓ (quota/auth/model)     |                                               ✗                                                |                                          ✗                                           |                              Debug logging                               |
-| **Installer**     |     ✓ TUI + one-liner      |                                               ✗                                                |                                          ✗                                           |                                    ✗                                     |
-| **OAuth Flow**    |  ✓ OpenCode integration    |                                            ✓ Native                                            |                                    Browser login                                     |                                 Keychain                                 |
-| **Tool Calling**  | ✓ OpenCode-owned loop |                                            ✓ Native                                            |                                    ✓ Experimental                                    |                                    ✗                                     |
-| **Stability**     | Stable (uses official CLI) |                                          Experimental                                          |                                        Stable                                        |                               Experimental                               |
-| **Dependencies**  |     bun, cursor-agent      |                                              npm                                               |                                  bun, cursor-agent                                   |                               Node.js 18+                                |
-| **Port**          |           32124            |                                             18741                                              |                                        32123                                         |                                   4141                                   |
+OpenCode executes its own tools. This keeps edit/write/apply_patch behavior native, including patch previews and permissions.
 
 ## Troubleshooting
 
-- `fetch() URL is invalid` or auth errors → `cursor-agent login` or `opencode auth login --provider cursor-acp`
-- Model not responding → verify your API key/quota
-- Quota exceeded → [cursor.com/settings](https://cursor.com/settings)
-- Proxy not starting → ensure port 32124 is available
+Check setup:
 
-Debug logging: `CURSOR_ACP_LOG_LEVEL=debug opencode run "your prompt" --model cursor-acp/auto`
-
-## Roadmap
-
-```mermaid
-flowchart LR
-    P1[/Stabilise/] --> P2[/Simplify/] --> P3[/ACP/]
-
-    style P1 fill:#264653,stroke:#1d3557,color:#fff
-    style P2 fill:#264653,stroke:#1d3557,color:#fff
-    style P3 fill:#495057,stroke:#343a40,color:#adb5bd
-    style P4 fill:#495057,stroke:#343a40,color:#adb5bd
+```bash
+open-cursor doctor
 ```
 
-[X] **Stabilise** — Clean up dead code, fix test isolation
-[X] **Simplify** — Provider-only cursor-agent backend with native OpenCode tools
-[ ] **ACP** — Structured protocol end-to-end if Cursor's ACP path becomes stable
+Common fixes:
 
-**ACP (deferred)** — End goal is an even thinner `OpenCode → Cursor ACP` plugin once Cursor's ACP path is stable.
+```bash
+cursor-agent login
+open-cursor install
+open-cursor sync-models
+```
+
+Enable debug logs:
+
+```bash
+CURSOR_ACP_LOG_LEVEL=debug opencode run "test" --model cursor-acp/auto
+```
+
+## Development
+
+```bash
+git clone https://github.com/EvanNotFound/opencode-cursor.git
+cd opencode-cursor
+bun install
+bun run build
+bun test tests/unit
+```
 
 ## License
 
