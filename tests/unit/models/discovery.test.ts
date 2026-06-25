@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { parseCursorModelsOutput } from "../../../src/cli/model-discovery.js";
+import { parseCursorModelsOutput } from "../../../src/models/discovery.js";
 
-describe("cli/model-discovery", () => {
+describe("models/discovery", () => {
   it("parses model ids and names from cursor-agent output", () => {
     const output = `
 auto - Auto (current) (default)

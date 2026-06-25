@@ -37,8 +37,7 @@ import {
   extractOpenAiToolCall,
   type OpenAiToolCall,
 } from "./proxy/tool-loop.js";
-import { discoverModelsFromCursorAgent } from "./cli/model-discovery.js";
-import { autoRefreshModels } from "./models/sync.js";
+import { discoverModelsFromCursorAgent } from "./models/discovery.js";
 import { extractOpenAiUsageFromResult, createChatCompletionUsageChunk, type OpenAiUsage } from "./usage.js";
 import { formatErrorForUser, isResumeSpecificFailure, parseAgentError } from "./utils/errors.js";
 import { createLogger } from "./utils/logger.js";
@@ -593,7 +592,6 @@ export const CursorPlugin: Plugin = async ({ directory, worktree }: PluginInput)
   const workspaceDirectory = resolveWorkspaceDirectory(worktree, directory);
   log.debug("Plugin initializing", { directory, worktree, workspaceDirectory, cwd: process.cwd() });
   await ensurePluginDirectory();
-  autoRefreshModels().catch(() => {});
   const proxyBaseURL = await ensureCursorProxyServer(workspaceDirectory);
 
   return {

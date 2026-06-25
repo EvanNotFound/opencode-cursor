@@ -9,7 +9,7 @@ import {
 import {
   discoverModelsFromCursorAgent,
   parseCursorModelsOutput,
-} from "../src/cli/model-discovery.js";
+} from "../src/models/discovery.js";
 
 type Options = {
   modelsFile?: string;

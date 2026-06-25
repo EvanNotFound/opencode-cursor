@@ -10,11 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### BREAKING
 
 - **Runtime:** Removed the legacy SDK backend, MCP bridge, local tool executors, `mcptool`, and proxy-exec/local tool loop modes. The package is now provider-only and uses Cursor's official `cursor-agent` CLI.
+- **CLI:** Removed the `open-cursor` and `cursor-discover` binaries, installer, setup commands, uninstall command, and config-mutating model sync. Users configure OpenCode manually.
 
 ### Changed
 
 - **Tools:** Cursor tool-call events are translated to OpenAI-compatible `tool_calls` only. OpenCode executes native tools, preserving patch previews and permission handling.
-- **Model discovery:** `/v1/models` and startup auto-refresh query `cursor-agent models` only, with the static fallback retained for offline installs.
+- **Model discovery:** `/v1/models` queries `cursor-agent models` only.
 
 ### Fixed
 

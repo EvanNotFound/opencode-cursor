@@ -1,6 +1,6 @@
 # Publishing `@evanovation/open-cursor`
 
-This project is publishable as the npm package `@evanovation/open-cursor`. The binary entrypoint is `open-cursor` (`dist/cli/opencode-cursor.js`).
+This project is publishable as the npm package `@evanovation/open-cursor`. It ships as an OpenCode plugin package and does not include setup CLI binaries.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ This project is publishable as the npm package `@evanovation/open-cursor`. The b
 
 1. Decide if this is a publish-worthy change.
    - Docs-only or refactors with no user-visible behavior change: do not publish.
-   - User-visible changes (plugin behavior, installer behavior, CLI behavior): publish.
+   - User-visible changes (plugin behavior or package setup): publish.
 2. Update version in `package.json` (semver) only when publishing.
 2. Build and run tests locally:
    - `bun install`

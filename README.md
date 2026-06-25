@@ -39,9 +39,27 @@ cursor-agent login
 
 ## Install
 
-```bash
-npm install -g @evanovation/open-cursor
-open-cursor install
+This package does not include a setup CLI and does not edit your OpenCode config.
+Add the plugin and provider yourself in `opencode.json`:
+
+```json
+{
+  "plugin": ["@evanovation/open-cursor@latest"],
+  "provider": {
+    "cursor-acp": {
+      "name": "Cursor",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:32124/v1"
+      },
+      "models": {
+        "auto": { "name": "Auto" },
+        "sonnet-4.5": { "name": "Claude Sonnet 4.5" },
+        "gpt-5.5": { "name": "GPT-5.5" }
+      }
+    }
+  }
+}
 ```
 
 Verify:
@@ -55,18 +73,6 @@ opencode models | grep cursor-acp
 ```bash
 opencode run "hello" --model cursor-acp/auto
 opencode run "write a small script" --model cursor-acp/sonnet-4.5
-```
-
-## Sync models
-
-```bash
-open-cursor sync-models
-```
-
-Optional compact model list:
-
-```bash
-open-cursor sync-models --variants --compact
 ```
 
 ## How it works
@@ -83,18 +89,11 @@ OpenCode executes its own tools. This keeps edit/write/apply_patch behavior nati
 
 ## Troubleshooting
 
-Check setup:
-
-```bash
-open-cursor doctor
-```
-
 Common fixes:
 
 ```bash
 cursor-agent login
-open-cursor install
-open-cursor sync-models
+cursor-agent models
 ```
 
 Enable debug logs:
