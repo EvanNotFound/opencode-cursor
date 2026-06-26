@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "../utils/logger.js";
+import { cursorToolName } from "./tool-alias.js";
 
 const log = createLogger("proxy:prompt-builder");
 
@@ -39,8 +40,17 @@ export function buildToolFingerprint(tools: Array<any>): string {
   return `${parts.length}:${parts.join("|")}`;
 }
 
-function buildToolSchemaBlock(tools: Array<any>): string {
-  const fingerprint = buildToolFingerprint(tools);
+type PromptOptions = {
+  cursorTools?: boolean;
+};
+
+function cacheKey(tools: Array<any>, options: PromptOptions): string {
+  const prefix = options.cursorTools ? "cursor" : "native";
+  return `${prefix}:${buildToolFingerprint(tools)}`;
+}
+
+function buildToolSchemaBlock(tools: Array<any>, options: PromptOptions): string {
+  const fingerprint = cacheKey(tools, options);
   if (fingerprint && fingerprint === _cachedToolFingerprint) {
     return _cachedToolBlock;
   }
@@ -48,7 +58,8 @@ function buildToolSchemaBlock(tools: Array<any>): string {
   const toolDescs = tools
     .map((t: any) => {
       const fn = t.function || t;
-      const name = fn.name || "unknown";
+      const nativeName = fn.name || "unknown";
+      const name = options.cursorTools ? cursorToolName(nativeName) : nativeName;
       const desc = fn.description || "";
       const params = fn.parameters;
       const paramStr = params ? JSON.stringify(params) : "{}";
@@ -56,9 +67,13 @@ function buildToolSchemaBlock(tools: Array<any>): string {
     })
     .join("\n");
 
+  const guidance = options.cursorTools
+    ? "Tool guidance: use the oc_* tool names listed below. For file work use oc_read, oc_write, and oc_edit. Do not call read, write, or edit directly."
+    : "Tool guidance: prefer write/edit for file changes; use bash mainly to run commands/tests.";
+
   const block =
     `SYSTEM: You have access to the following tools. When you need to use one, respond with a tool_call in the standard OpenAI format.\n` +
-    `Tool guidance: prefer write/edit for file changes; use bash mainly to run commands/tests.\n\nAvailable tools:\n${toolDescs}`;
+    `${guidance}\n\nAvailable tools:\n${toolDescs}`;
 
   if (fingerprint) {
     _cachedToolFingerprint = fingerprint;
@@ -73,7 +88,7 @@ function buildToolSchemaBlock(tools: Array<any>): string {
  * Handles role:"tool" result messages and assistant tool_calls that
  * plain text flattening would silently drop.
  */
-export function buildPromptFromMessages(messages: Array<any>, tools: Array<any>, subagentNames: string[] = []): string {
+export function buildPromptFromMessages(messages: Array<any>, tools: Array<any>, subagentNames: string[] = [], options: PromptOptions = {}): string {
   if (log.isDebugEnabled()) {
     const messageSummary = messages.map((m: any, i: number) => {
       const role = m?.role ?? "?";
@@ -122,14 +137,15 @@ export function buildPromptFromMessages(messages: Array<any>, tools: Array<any>,
   const lines: string[] = [];
 
   if (tools.length > 0) {
-    lines.push(buildToolSchemaBlock(tools));
+    lines.push(buildToolSchemaBlock(tools, options));
     const hasTaskTool = tools.some((t: any) => {
       const name = (t?.function?.name ?? t?.name ?? "").toLowerCase();
       return name === "task";
     });
     if (hasTaskTool && subagentNames.length > 0) {
+      const taskName = options.cursorTools ? cursorToolName("task") : "task";
       lines.push(
-        `When calling the task tool, set subagent_type to one of: ${subagentNames.join(", ")}. Do not omit this parameter.`
+        `When calling the ${taskName} tool, set subagent_type to one of: ${subagentNames.join(", ")}. Do not omit this parameter.`
       );
     }
   }
@@ -156,7 +172,8 @@ export function buildPromptFromMessages(messages: Array<any>, tools: Array<any>,
     ) {
       const tcTexts = message.tool_calls.map((tc: any) => {
         const fn = tc.function || {};
-        return `tool_call(id: ${tc.id || "?"}, name: ${fn.name || "?"}, args: ${fn.arguments || "{}"})`;
+        const name = options.cursorTools && typeof fn.name === "string" ? cursorToolName(fn.name) : fn.name;
+        return `tool_call(id: ${tc.id || "?"}, name: ${name || "?"}, args: ${fn.arguments || "{}"})`;
       });
       const text = typeof message.content === "string" ? message.content : "";
       lines.push(`ASSISTANT: ${text ? text + "\n" : ""}${tcTexts.join("\n")}`);

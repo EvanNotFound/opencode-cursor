@@ -48,6 +48,45 @@ describe("buildPromptFromMessages", () => {
     expect(result).toContain("USER: Read foo.txt");
   });
 
+  it("can show oc_* names for cursor-agent", () => {
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "read",
+          description: "Read a file",
+          parameters: { type: "object", properties: { path: { type: "string" } } },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "edit",
+          description: "Edit a file",
+          parameters: { type: "object" },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "write",
+          description: "Write a file",
+          parameters: { type: "object" },
+        },
+      },
+    ];
+    const messages = [{ role: "user", content: "Read foo.txt" }];
+    const result = buildPromptFromMessages(messages, tools, [], { cursorTools: true });
+
+    expect(result).toContain("use the oc_* tool names listed below");
+    expect(result).toContain("- oc_read: Read a file");
+    expect(result).toContain("- oc_edit: Edit a file");
+    expect(result).toContain("- oc_write: Write a file");
+    expect(result).not.toContain("- read: Read a file");
+    expect(result).not.toContain("- edit: Edit a file");
+    expect(result).not.toContain("- write: Write a file");
+  });
+
   it("handles role:tool result messages", () => {
     const messages = [
       { role: "user", content: "Read the file" },
@@ -79,6 +118,22 @@ describe("buildPromptFromMessages", () => {
 
     expect(result).toContain("ASSISTANT: Let me read that file.");
     expect(result).toContain('tool_call(id: call_1, name: read, args: {"path":"foo.txt"})');
+  });
+
+  it("shows prior tool calls as oc_* names for cursor-agent", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: "Let me read that file.",
+        tool_calls: [
+          { id: "call_1", function: { name: "read", arguments: '{"path":"foo.txt"}' } },
+        ],
+      },
+    ];
+    const result = buildPromptFromMessages(messages, [], [], { cursorTools: true });
+
+    expect(result).toContain('tool_call(id: call_1, name: oc_read, args: {"path":"foo.txt"})');
+    expect(result).not.toContain('name: read, args: {"path":"foo.txt"}');
   });
 
   it("handles assistant tool_calls without content", () => {

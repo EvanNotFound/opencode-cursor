@@ -131,7 +131,7 @@ export function resolvePromptForBackend(input: {
 }): ResolvedPrompt {
   let fullPrompt: string | undefined;
   const getFullPrompt = () =>
-    fullPrompt ??= buildPromptFromMessages(input.messages, input.tools, input.subagentNames);
+    fullPrompt ??= buildPromptFromMessages(input.messages, input.tools, input.subagentNames, { cursorTools: true });
 
   if (input.backend !== "cursor-agent" || !isSessionResumeEnabled()) {
     return { prompt: getFullPrompt(), usedIncremental: false };

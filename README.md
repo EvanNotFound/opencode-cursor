@@ -19,7 +19,8 @@ I am building this because I want the smallest useful version of the idea:
 - Cursor subscription models inside OpenCode
 - native OpenCode tools
 - native OpenCode patch previews
-- no custom `oc_*` tool bridge
+- Cursor-facing `oc_*` tool aliases
+- no custom local tool executor
 - no SDK backend
 - no MCP bridge
 - no extra compatibility layers
@@ -86,6 +87,8 @@ http://127.0.0.1:32124/v1
 The proxy starts `cursor-agent`, converts Cursor stream-json output into OpenAI-compatible responses, and sends tool calls back to OpenCode.
 
 OpenCode executes its own tools. This keeps edit/write/apply_patch behavior native, including patch previews and permissions.
+
+Cursor sees aliases like `oc_read`, `oc_write`, and `oc_edit` to avoid conflicts with its own tools. The proxy translates those back to native OpenCode tool names before returning them to OpenCode.
 
 ## Troubleshooting
 

@@ -1,5 +1,6 @@
 import type { StreamJsonToolCallEvent } from "../streaming/types.js";
 import { createLogger } from "../utils/logger.js";
+import { nativeToolName } from "./tool-alias.js";
 
 const log = createLogger("proxy:tool-loop");
 
@@ -44,6 +45,16 @@ const TOOL_NAME_ALIASES = new Map<string, string>([
   ["writefile", "write"],
   // read aliases
   ["ocread", "read"],
+  // Cursor-facing aliases shown in prompts
+  ["ocbash", "bash"],
+  ["ocglob", "glob"],
+  ["ocls", "ls"],
+  ["octodowrite", "todowrite"],
+  ["octodoread", "todoread"],
+  ["ocwebfetch", "webfetch"],
+  ["octask", "task"],
+  ["ocquestion", "question"],
+  ["ocskill", "skill"],
   // grep aliases
   ["ocgrep", "grep"],
   // glob aliases
@@ -305,6 +316,16 @@ function resolveAllowedToolName(name: string, allowedToolNames: Set<string>): st
   }
 
   const normalizedName = normalizeAliasKey(name);
+  const nativeName = nativeToolName(name);
+  if (nativeName) {
+    const nativeNormalized = normalizeAliasKey(nativeName);
+    for (const allowedName of allowedToolNames) {
+      if (normalizeAliasKey(allowedName) === nativeNormalized) {
+        return allowedName;
+      }
+    }
+  }
+
   for (const allowedName of allowedToolNames) {
     if (normalizeAliasKey(allowedName) === normalizedName) {
       return allowedName;

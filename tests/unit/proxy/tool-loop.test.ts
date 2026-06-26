@@ -178,6 +178,42 @@ describe("proxy/tool-loop", () => {
     expect(result.toolCall?.function.name).toBe("bash");
   });
 
+  it("maps oc_bash to native bash", () => {
+    const event = createToolCallEvent("oc_bash", { command: "pwd" });
+
+    const result = extractOpenAiToolCall(event, new Set(["bash"]));
+
+    expect(result.action).toBe("intercept");
+    expect(result.toolCall?.function.name).toBe("bash");
+  });
+
+  it("maps oc_edit to native edit", () => {
+    const event = createToolCallEvent("oc_edit", { path: "a.txt", old: "a", new: "b" });
+
+    const result = extractOpenAiToolCall(event, new Set(["edit"]));
+
+    expect(result.action).toBe("intercept");
+    expect(result.toolCall?.function.name).toBe("edit");
+  });
+
+  it("maps oc_write to native write", () => {
+    const event = createToolCallEvent("oc_write", { path: "a.txt", content: "hello" });
+
+    const result = extractOpenAiToolCall(event, new Set(["write"]));
+
+    expect(result.action).toBe("intercept");
+    expect(result.toolCall?.function.name).toBe("write");
+  });
+
+  it("does not run oc_* aliases unless the native tool is allowed", () => {
+    const event = createToolCallEvent("oc_edit", { path: "a.txt", old: "a", new: "b" });
+
+    const result = extractOpenAiToolCall(event, new Set(["read"]));
+
+    expect(result.action).toBe("passthrough");
+    expect(result.passthroughName).toBe("oc_edit");
+  });
+
   it("maps createDirectory alias to allowed mkdir tool name", () => {
     const event: any = {
       type: "tool_call",
